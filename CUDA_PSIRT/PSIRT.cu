@@ -1,7 +1,7 @@
 #include "ProjectionController.cu"
 #include <cstdio>
 #include <stdlib.h>
-
+#define DEBUG_PRINT
 typedef struct {
 	Projection** projections;
 	Particle** particles;
@@ -28,10 +28,57 @@ void read_sinogram(PSIRT* psirt);
 // DEVICE FUNCTIONS
 __device__ int update_particles(PSIRT* psirt);
 __device__ void optimize(PSIRT* psirt);
-__device__ void run_psirt(PSIRT* psirt);
+__device__ int run_psirt(PSIRT* psirt);
 __device__ void optimization_check(PSIRT* psirt);
 
+__device__ PSIRT* get_psirt_dev(
+	Projection** projections,
+	Particle** particles,
+	int n_projections,
+	int n_trajectories,
+	int n_particles,
+	int is_optimized,
+	int is_optimizing_dirty_particle,
+	int optim_is_ranked,
+	int optim_curr_part,
+	int optim_curr_iteration,
+	int optim_max_iterations
+	);
 
+__host__ __device__ void set_psirt(PSIRT* psirt);
+/*
+
+__device__ PSIRT* get_psirt_dev(
+	Projection** projections,
+	Particle** particles,
+	int n_projections,
+	int n_trajectories,
+	int n_particles,
+	int is_optimized,
+	int is_optimizing_dirty_particle,
+	int optim_is_ranked,
+	int optim_curr_part,
+	int optim_curr_iteration,
+	int optim_max_iterations
+	)
+{
+	PSIRT *psirt;
+	cudaMalloc((void**)&psirt,sizeof(PSIRT));
+
+	psirt->projections = projections;
+	psirt->particles	= particles;
+	psirt->n_projections = n_projections;
+	psirt->n_trajectories = n_trajectories;
+	psirt->n_particles = n_particles;
+	psirt->is_optimized = is_optimized;
+	psirt->is_optimizing_dirty_particle = is_optimizing_dirty_particle;
+	psirt->optim_curr_part = optim_curr_part;
+	psirt->optim_curr_iteration = optim_curr_iteration;
+	psirt->optim_max_iterations = optim_max_iterations;
+
+	return psirt;
+}
+*/
 
 __host__ PSIRT* init_psirt()
 {
@@ -55,7 +102,7 @@ __host__ PSIRT* init_psirt()
 	return psirt;
 }
 
-__device__ void run_psirt(PSIRT* psirt)
+__device__ int run_psirt(PSIRT* psirt)
 {
 	// ---------------------------
 	// *** ATUALIZAR POSICOES DAS PARTICULAS ***
@@ -78,19 +125,9 @@ __device__ void run_psirt(PSIRT* psirt)
 	if (has_converged(psirt->projections,psirt->n_projections))							// convergiu
 	{
 		if (psirt->optim_curr_part < psirt->n_particles) optimize(psirt);						// otimizacao (comecar)
-		else
-		{
-#ifndef NO_RECON
-			//			printf("\r\n[DONE] \t OPTIMZ (CONVERGED) \t %d us",(timestep = (tv.tv_usec-timestep)));
-			//draw_reconstruction_bitmap(psirt);									// terminou otimizacao: desenhar
-			//			printf("\r\n[DONE] \t RECONSTRUCTION \t %d us\r\n",(timestep = (tv.tv_usec-timestep)));
-#endif
-#ifdef NO_RECON
-			//			printf("\r\n[DONE] \t OPTIMZ (CONVERGED) \t %d us\r\n",((tv.tv_usec-timestep)));
-			exit(1);
-#endif
-		}
+		else return 0;	// DONE
 	}
+	return 1;	// NOT DONE
 }
 
 __device__ void optimize(PSIRT* psirt)
@@ -181,8 +218,9 @@ __device__ int update_particles(PSIRT* psirt)
 	int i=0,j=0,k=0;
 	Vector2D resultant_force;
 	for (i = 0; i < psirt->n_particles; i++) {
+		printf("\r\ni=%d",i);
 		if (psirt->particles[i]->status != DEAD) {
-
+				
 			set(&resultant_force,0.0,0.0);
 			// calcular força resultante primeiro
 			Vector2D resultant_vector;
@@ -194,7 +232,9 @@ __device__ int update_particles(PSIRT* psirt)
 				}
 
 			}
-
+#ifdef DEBUG_PRINT
+			printf("\r\nPART [%d] \t pos (%f, %f)", i, psirt->particles[i]->location->x, psirt->particles[i]->location->y );
+#endif
 			set(&resultant_force, -resultant_force.x, -resultant_force.y);
 
 			update_particle(psirt->particles[i], &resultant_force);

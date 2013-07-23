@@ -41,13 +41,14 @@
 
 // DATA STRUCTURES
 typedef struct {
-	Vector2D* source, *direction;
+	Vector2D source;
+	Vector2D direction;
 	int n_particulas_estavel;
 	int n_particulas_atual;
 } Trajectory;
 
 // HOST FUNCTIONS
-Trajectory* new_trajectory(Vector2D* s, Vector2D* d, int part_est);
+Trajectory* new_trajectory(Vector2D s, Vector2D d, int part_est);
 
 
 // DEVICE FUNCTIONS
@@ -66,7 +67,7 @@ __device__ inline void directionFrom(Vector2D *point, Trajectory *t, Vector2D *d
 
 // IMPLEMENTATION
 
-Trajectory* new_trajectory(Vector2D* s, Vector2D* d, int part_est) {
+Trajectory* new_trajectory(Vector2D s, Vector2D d, int part_est) {
 	Trajectory *t = (Trajectory*)malloc(sizeof(Trajectory));
 	t->source=s;
 	t->direction=d;
@@ -76,20 +77,20 @@ Trajectory* new_trajectory(Vector2D* s, Vector2D* d, int part_est) {
 }
 
 __device__ float distance(Vector2D* p, Trajectory* t) {
-	Vector2D u,*v,dist;
+	Vector2D u,v,dist;
 	v = t->direction;
-	minus_void(p,t->source, &u);
+	minus_void(p,&(t->source), &u);
 
-	float pp = dot_product(&u,v) / dot_product(v,v);
+	float pp = dot_product(&u,&v) / dot_product(&v,&v);
 
 	Vector2D proj;
-	set(&proj,v->x, v->y);
+	set(&proj,v.x, v.y);
 
 	normalize_void(&proj);
 	mult_constant_void(&proj,pp);
 	minus_void(&u,&proj,&dist);
 
-	double mag = magnitude(&dist);
+	float mag = magnitude(&dist);
 
 	return mag;
 }
@@ -111,10 +112,10 @@ __device__ int current_status(Trajectory* t)
 __device__ inline void directionFrom(Vector2D *point, Trajectory *t, Vector2D *direction)
 {
 	Vector2D begin, end;// = clone(t->source);
-	set(&begin, t->source->x,t->source->y);
+	set(&begin, t->source.x,t->source.y);
 	set(&end, 0.0,0.0);
 
-	sum_void(t->source, t->direction, &end);
+	sum_void(&(t->source), &(t->direction), &end);
 
 	Vector2D u, v;
 	set(&u, point->x - begin.x, point->y - begin.y);
@@ -127,6 +128,7 @@ __device__ inline void directionFrom(Vector2D *point, Trajectory *t, Vector2D *d
 
 	direction->x = u.x - projuv.x;
 	direction->y = u.y - projuv.y;
+
 
 	//	return new_vector(u->x - projuv->x, u->y - projuv->y);
 }

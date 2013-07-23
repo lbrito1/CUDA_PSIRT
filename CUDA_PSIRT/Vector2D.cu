@@ -20,7 +20,7 @@ Vector2D* clone(Vector2D* a);
 
 // DEVICE FUNCTIONS
 __host__ __device__ void set_vector(Vector2D* a, double x, double y);
-__device__ void sum_void(Vector2D* a, Vector2D* b, Vector2D* result);
+__host__ __device__ void sum_void(Vector2D* a, Vector2D* b, Vector2D* result);
 __host__ __device__ void minus_void(Vector2D* a, Vector2D* b, Vector2D* result);
 __device__ double dot_product(Vector2D* a, Vector2D* b);
 __device__ double magnitude(Vector2D* a);
@@ -41,7 +41,7 @@ __host__ __device__ void set_vector(Vector2D* a, double x, double y)
 	a->x=x;a->y=y;
 }
 
-__device__ void sum_void(Vector2D* a, Vector2D* b, Vector2D* result)
+__host__ __device__ void sum_void(Vector2D* a, Vector2D* b, Vector2D* result)
 {
 	result->x = a->x+b->x;
 	result->y = a->y+b->y;

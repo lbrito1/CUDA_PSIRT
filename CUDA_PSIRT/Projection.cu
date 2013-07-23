@@ -34,10 +34,10 @@ __device__ int has_converged(Projection **p, int n_projections)
 
 Projection *new_parallel_projection(double angle, int ntraj, int* partptraj)
 {
-	Projection *p = (Projection*)malloc(sizeof(Projection));
+	Projection *p = (Projection *)malloc(sizeof(Projection));
 
 	p->n_traj = ntraj;
-	p->lista_trajetorias = (Trajectory**)malloc(ntraj*sizeof(Trajectory));
+	p->lista_trajetorias = (Trajectory**) malloc(ntraj*sizeof(Trajectory));
 
 	Vector2D* director = new_vector(1.0f,0.0f);
 	RotateClockWise(director,angle);
@@ -60,7 +60,7 @@ Projection *new_parallel_projection(double angle, int ntraj, int* partptraj)
 		Vector2D* center = new_vector(0.0,0.0);
 		float coef = i/((float)(ntraj-1));
 		lerp(begin,end,coef,center);
-		Trajectory* traj = new_trajectory(center,director,partptraj[i]);
+		Trajectory* traj = new_trajectory(*center,*director,partptraj[i]);
 
 		p->lista_trajetorias[i] = traj;
 	}
