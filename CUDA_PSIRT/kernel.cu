@@ -29,7 +29,7 @@ void display();
 void test_psirt();
 
 __global__ void psirt_kernel(PSIRT* psirt, Projection** dev_proj);
-__global__ void test(Projection** part);
+
 GLuint positionsVBO;
 struct cudaGraphicsResource *positionsVBO_CUDA;
 
@@ -138,19 +138,35 @@ void init_opengl(int argc, char* argv[])
 
 
 
-void test_psirt()
-{
-	PSIRT* host_psirt = init_psirt();
 
+
+
+
+
+
+
+
+__global__ void ts(Vector2D* l)
+{
+	printf("\r\nx=%f",l[0].x);
+}
+
+__global__ void test(Trajectory* t)
+{
+	printf("\r\nPart = %d",t[0].n_particulas_atual);
+}
+
+void test_psirt(PSIRT* host_psirt)
+{
 	int n_proj = host_psirt->n_projections;
 	int n_traj = host_psirt->n_trajectories;
 	int n_ttl_traj = n_proj * n_traj;
 	
-	Trajectory** traj;
-	int ttl_traj_len = (host_psirt->n_trajectories) * (host_psirt->n_projections);
-	size_t ttl_traj_size = sizeof(Trajectory*) * ttl_traj_len;
+	int ttl_traj_len = n_proj * n_traj;
+	size_t ttl_traj_size = sizeof(Trajectory) * ttl_traj_len;
 
-	traj = (Trajectory**) malloc(ttl_traj_size);
+	Trajectory* traj;
+	GPUerrchk(cudaMalloc((void**)&traj, ttl_traj_size));
 
 	int i,j,k;
 	
@@ -160,10 +176,27 @@ void test_psirt()
 
 		for (j=0; j< n_traj; j++,k++)
 		{
-			GPUerrchk(cudaMalloc((void**)&traj[k], sizeof(Trajectory)));
+			Trajectory t = *p->lista_trajetorias[j];
+			
+			GPUerrchk(cudaMemcpy(&(traj[k]), &t, sizeof(Trajectory), cudaMemcpyHostToDevice));
 		}
 	}
+	test<<<1,1>>>(traj);
+	
+	
 }
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 void prep_psirt() 
@@ -235,11 +268,7 @@ void prep_psirt()
 	free(host_psirt);*/
 }
 
-__global__ void test(Projection** proj)
-{
-	printf("\r\nPart = %d",proj[0]->n_traj);
-	printf("CUDA");
-}
+
 
 __global__ void psirt_kernel(PSIRT* psirt, Projection** dev_proj)
 {
@@ -264,6 +293,8 @@ __global__ void psirt_kernel(PSIRT* psirt, Projection** dev_proj)
 int main(int argc, char* argv[])
 {
 	cudaError_t cudaStatus;
+
+		PSIRT* host_psirt = init_psirt();
 	
 	#ifdef DEBUG_OPENGL
 		// 1. INICIALIZAR (HOST)
@@ -283,7 +314,7 @@ int main(int argc, char* argv[])
 
 		//prep_psirt(); // CUDA
 
-		//test_psirt();
+		test_psirt(host_psirt);
 	#endif
 
 	
@@ -301,7 +332,7 @@ int main(int argc, char* argv[])
     }
 	
 
-	PSIRT* host_psirt = init_psirt();
+
 	draw_projection_bitmap(host_psirt);
 	draw_reconstruction_bitmap(host_psirt);
 	

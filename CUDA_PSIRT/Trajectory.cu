@@ -40,6 +40,7 @@
 #include "Particle.cu"
 
 // DATA STRUCTURES
+
 typedef struct {
 	Vector2D source;
 	Vector2D direction;
@@ -57,7 +58,7 @@ __device__ Vector2D* trajectory_intersection(Trajectory *t1, Trajectory *t2);
 __device__ float distance(Vector2D* p, Trajectory* t);
 __device__ Vector2D* projection(Vector2D* p, Trajectory* t);
 __device__ int current_status(Trajectory* t);
-__device__ double trajectory_force(Trajectory* t);
+__device__ float trajectory_force(Trajectory* t);
 __device__ inline void resultant(Trajectory *t, Particle* p, Vector2D *resultant);
 __device__ void update_trajectory(Trajectory *t, Particle **p, int nparticle);
 __device__ inline void directionFrom(Vector2D *point, Trajectory *t, Vector2D *direction);
@@ -66,7 +67,6 @@ __device__ inline void directionFrom(Vector2D *point, Trajectory *t, Vector2D *d
 
 
 // IMPLEMENTATION
-
 Trajectory* new_trajectory(Vector2D s, Vector2D d, int part_est) {
 	Trajectory *t = (Trajectory*)malloc(sizeof(Trajectory));
 	t->source=s;
@@ -95,7 +95,7 @@ __device__ float distance(Vector2D* p, Trajectory* t) {
 	return mag;
 }
 
-__device__ double trajectory_force(Trajectory *t)
+__device__ float trajectory_force(Trajectory *t)
 {
 	int delta = t->n_particulas_estavel - t->n_particulas_atual;
 	//	printf("\r\nATUAL = %d \t ESTAVEL = %d", t->n_particulas_atual, t->n_particulas_estavel);
@@ -143,7 +143,7 @@ __device__ void update_trajectory(Trajectory *t, Particle **p, int nparticle)
 		if (p[i]->status == ALIVE)
 		{
 			// Find distance from point to line segment (orthogonal)
-			double distance_point_line = distance(p[i]->location,t);
+			float distance_point_line = distance(p[i]->location,t);
 
 			if (distance_point_line<TRAJ_PART_THRESHOLD)
 			{
@@ -171,11 +171,11 @@ __device__ inline void resultant(Trajectory *t, Particle* p, Vector2D *resultant
 	//	normalize(ortonormal);		//TODO aparentemente nao influencia movimento das particulas
 
 	// Find distance from point to line segment (orthogonal)
-	double distance_point_line = distance(p->location,t);
+	float distance_point_line = distance(p->location,t);
 	// Calculate force according to F = m1*m2/r²
-	double mass_trajectory = trajectory_force(t);
-	double mass_particle   = p->mass;
-	double force = 0;
+	float mass_trajectory = trajectory_force(t);
+	float mass_particle   = p->mass;
+	float force = 0;
 	if (distance_point_line>0.01)
 		force = (mass_trajectory * mass_particle) / (distance_point_line*distance_point_line);
 	force/=10;
