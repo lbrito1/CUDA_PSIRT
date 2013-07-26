@@ -233,7 +233,7 @@ __device__ int update_particles(PSIRT* psirt)
 
 			}
 #ifdef DEBUG_PRINT
-			printf("\r\nPART [%d] \t pos (%f, %f)", i, psirt->particles[i]->location->x, psirt->particles[i]->location->y );
+			printf("\r\nPART [%d] \t pos (%f, %f)", i, psirt->particles[i]->location.x, psirt->particles[i]->location.y );
 #endif
 			set(&resultant_force, -resultant_force.x, -resultant_force.y);
 
@@ -253,12 +253,12 @@ void init_particles(PSIRT* psirt) {
 	psirt->particles = (Particle**)malloc(sizeof(Particle) * psirt->n_particles);
 	for (i = 0; i < psirt->n_particles; i++) {
 		psirt->particles[i] = new_particle();
-		psirt->particles[i]->location->x = rand() / (double) RAND_MAX;
-		psirt->particles[i]->location->y = rand() / (double) RAND_MAX;
+		psirt->particles[i]->location.x = rand() / (double) RAND_MAX;
+		psirt->particles[i]->location.y = rand() / (double) RAND_MAX;
 		if (rand() > lim)
-			psirt->particles[i]->location->x = -psirt->particles[i]->location->x;
+			psirt->particles[i]->location.x = -psirt->particles[i]->location.x;
 		if (rand() > lim)
-			psirt->particles[i]->location->y = -psirt->particles[i]->location->y;
+			psirt->particles[i]->location.y = -psirt->particles[i]->location.y;
 	}
 
 }

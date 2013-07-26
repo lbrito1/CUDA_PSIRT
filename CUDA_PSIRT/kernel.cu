@@ -17,6 +17,8 @@ inline void GPUassert(cudaError_t code, char * file, int line, bool Abort=true)
     }       
 }
 
+
+
 #define GPUerrchk(ans) { GPUassert((ans), __FILE__, __LINE__); }
 
 
@@ -86,10 +88,10 @@ void opengl_draw_particles(PSIRT* psirt)
 	for (i = 0; i < psirt->n_particles; i++) {
 		if (psirt->particles[i]->status != DEAD) {
 			glColor3f(1.0, 0.0, 0.0);
-			glVertex2f(psirt->particles[i]->location->x, psirt->particles[i]->location->y);
+			glVertex2f(psirt->particles[i]->location.x, psirt->particles[i]->location.y);
 		} else {
 			glColor3f(0.0, 1.0, 0.0);
-			glVertex2f(psirt->particles[i]->location->x, psirt->particles[i]->location->y);
+			glVertex2f(psirt->particles[i]->location.x, psirt->particles[i]->location.y);
 		}
 		//printf("\r\n%d: \t%f,%f",i,psirt->particles[i]->location->x, psirt->particles[i]->location->y);
 	}
@@ -151,13 +153,16 @@ __global__ void ts(Vector2D* l)
 	printf("\r\nx=%f",l[0].x);
 }
 
-__global__ void test(Trajectory* t)
+__global__ void test(Trajectory* t, Particle* p)
 {
 	printf("\r\nPart = %d",t[0].n_particulas_atual);
 }
 
 void test_psirt(PSIRT* host_psirt)
 {
+
+	// 1: COPIAR PROJEÇÕES/TRAJETÓRIAS
+	
 	int n_proj = host_psirt->n_projections;
 	int n_traj = host_psirt->n_trajectories;
 	int n_ttl_traj = n_proj * n_traj;
@@ -181,9 +186,32 @@ void test_psirt(PSIRT* host_psirt)
 			GPUerrchk(cudaMemcpy(&(traj[k]), &t, sizeof(Trajectory), cudaMemcpyHostToDevice));
 		}
 	}
-	test<<<1,1>>>(traj);
+
+
+	// 2. COPIAR PARTÍCULAS
+
+	int n_part = host_psirt->n_particles;
+	int ttl_part_size = sizeof(Particle) * n_part;
+
+	Particle *part;
+	GPUerrchk(cudaMalloc((void**)&part, ttl_part_size));
+
+	for (i=0; i<n_part; i++)
+	{
+		Particle hp = *host_psirt->particles[i];
+		GPUerrchk(cudaMemcpy(&(part[i]), &hp, sizeof(Particle), cudaMemcpyHostToDevice));
+	}
+
+	test<<<1,1>>>(traj, part);
+
+
 	
+	// 3. REMONTAR PARAMETROS
+
 	
+
+
+
 }
 
 

@@ -40,14 +40,14 @@ double* reconstruction(PSIRT* psirt)
 	// Ajustar de acordo com o fator de escala.
 	// ---
 	for (i = 0; i < psirt->n_particles; i++) {
-		if ((psirt->particles[i]->location->x > -RECONSTRUCTION_SCALE_FACTOR)
-				&& (psirt->particles[i]->location->x < RECONSTRUCTION_SCALE_FACTOR)
-				&& (psirt->particles[i]->location->y > -RECONSTRUCTION_SCALE_FACTOR)
-				&& (psirt->particles[i]->location->y < RECONSTRUCTION_SCALE_FACTOR)) {
-			psirt->particles[i]->location->x += RECONSTRUCTION_SCALE_FACTOR;
-			psirt->particles[i]->location->y += RECONSTRUCTION_SCALE_FACTOR;
-			psirt->particles[i]->location->x /= 2 * RECONSTRUCTION_SCALE_FACTOR;
-			psirt->particles[i]->location->y /= 2 * RECONSTRUCTION_SCALE_FACTOR;
+		if ((psirt->particles[i]->location.x > -RECONSTRUCTION_SCALE_FACTOR)
+				&& (psirt->particles[i]->location.x < RECONSTRUCTION_SCALE_FACTOR)
+				&& (psirt->particles[i]->location.y > -RECONSTRUCTION_SCALE_FACTOR)
+				&& (psirt->particles[i]->location.y < RECONSTRUCTION_SCALE_FACTOR)) {
+			psirt->particles[i]->location.x += RECONSTRUCTION_SCALE_FACTOR;
+			psirt->particles[i]->location.y += RECONSTRUCTION_SCALE_FACTOR;
+			psirt->particles[i]->location.x /= 2 * RECONSTRUCTION_SCALE_FACTOR;
+			psirt->particles[i]->location.y /= 2 * RECONSTRUCTION_SCALE_FACTOR;
 		}
 	}
 	// ---
@@ -57,7 +57,7 @@ double* reconstruction(PSIRT* psirt)
 	Vector2D** scaled_particles = (Vector2D**) malloc(sizeof(Vector2D*) * psirt->n_particles);
 	for (i = 0; i < psirt->n_particles; i++) {
 		scaled_particles[i] = new_vector(0.0,0.0);
-		set(scaled_particles[i], psirt->particles[i]->location->x, psirt->particles[i]->location->y);
+		set(scaled_particles[i], psirt->particles[i]->location.x, psirt->particles[i]->location.y);
 		mult_constant_void(scaled_particles[i], RES_X);
 		//printf("\r\n ANTES: %f,%f \t DEPOIS: %f,%f",particles[i]->location->x, particles[i]->location->y,scaled_particles[i]->x,scaled_particles[i]->y  );
 	}

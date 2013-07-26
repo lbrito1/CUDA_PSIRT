@@ -8,6 +8,7 @@
     <CudaCompile Include="ProjectionController.cu" />
     <CudaCompile Include="PSIRT.cu" />
     <CudaCompile Include="Reconstruction.c" />
+    <CudaCompile Include="CUDA_utils.cu" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Vector2D.cu" />
