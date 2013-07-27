@@ -3,8 +3,8 @@
 #include <stdlib.h>
 #define DEBUG_PRINT
 typedef struct {
-	Projection** projections;
-	Particle** particles;
+	Projection* projections;
+	Particle* particles;
 
 	int n_projections;
 	int n_trajectories;
@@ -113,16 +113,16 @@ __device__ int run_psirt(PSIRT* psirt)
 	// *** CALCULO DE TRAJETORIAS SATISFEITAS ***
 	// ---------------------------
 	int i=0,j=0;
-	for (i=0;i<psirt->n_particles;i++) psirt->particles[i]->current_trajectories = 0; 	// zera #traj de cada particula
+	for (i=0;i<psirt->n_particles;i++) psirt->particles[i].current_trajectories = 0; 	// zera #traj de cada particula
 	for (i=0;i<psirt->n_projections;i++) 											// calcula #traj de cada particula
 		for (j=0;j<psirt->n_trajectories;j++)
-			update_trajectory(psirt->projections[i]->lista_trajetorias[j], psirt->particles, psirt->n_particles);
+			update_trajectory(&(psirt->projections[i].lista_trajetorias[j]), &psirt->particles, psirt->n_particles);
 
 	// ---------------------------
 	// *** OTIMIZACAO E CONVERGENCIA ***
 	// ---------------------------
 	optimization_check(psirt);													// otimizacao (continuar)
-	if (has_converged(psirt->projections,psirt->n_projections))							// convergiu
+	if (has_converged(&psirt->projections,psirt->n_projections))							// convergiu
 	{
 		if (psirt->optim_curr_part < psirt->n_particles) optimize(psirt);						// otimizacao (comecar)
 		else return 0;	// DONE
@@ -147,11 +147,11 @@ __device__ void optimize(PSIRT* psirt)
 		{
 			for (j = 0; j < psirt->n_particles; j++)
 			{
-				if (psirt->particles[j]->current_trajectories
-						> psirt->particles[i]->current_trajectories) {
-					memcpy(&temp, psirt->particles[j], sizeof(Particle));
-					memcpy(psirt->particles[j], psirt->particles[i], sizeof(Particle));
-					memcpy(psirt->particles[i], &temp, sizeof(Particle));
+				if (psirt->particles[j].current_trajectories
+						> psirt->particles[i].current_trajectories) {
+					memcpy(&temp, &psirt->particles[j], sizeof(Particle));
+					memcpy(&psirt->particles[j], &psirt->particles[i], sizeof(Particle));
+					memcpy(&psirt->particles[i], &temp, sizeof(Particle));
 				}
 			}
 		}
@@ -162,11 +162,11 @@ __device__ void optimize(PSIRT* psirt)
 	// CASO ESPECIAL
 	// partícula sem trajetoria, ELIMINAR SEM CHECAR
 	// ---------------------------
-	if (psirt->particles[psirt->optim_curr_part]->current_trajectories == 0)
+	if (psirt->particles[psirt->optim_curr_part].current_trajectories == 0)
 	{
 		//printf("\r\n[OPTIM]\tPARTICLE #%d DIED (0 TRAJ)", optim_curr_part);
 		psirt->is_optimizing_dirty_particle = 0;
-		psirt->particles[psirt->optim_curr_part]->status = DEAD;
+		psirt->particles[psirt->optim_curr_part].status = DEAD;
 		psirt->optim_curr_part++;
 	}
 
@@ -179,16 +179,16 @@ __device__ void optimize(PSIRT* psirt)
 		psirt->is_optimizing_dirty_particle = 1;
 
 		// COMECAR A CHECAR PARTICULA
-		if (psirt->particles[psirt->optim_curr_part]->status == ALIVE)
+		if (psirt->particles[psirt->optim_curr_part].status == ALIVE)
 		{
 			psirt->optim_curr_iteration = 0;
-			psirt->particles[psirt->optim_curr_part]->status = CHECKING;
+			psirt->particles[psirt->optim_curr_part].status = CHECKING;
 		}
 		// PARTICULA CHECADA & CONVERGIU -> REMOVER
-		else if (psirt->particles[psirt->optim_curr_part]->status == CHECKING)
+		else if (psirt->particles[psirt->optim_curr_part].status == CHECKING)
 		{
 			//printf("\r\n[OPTIM]\tPARTICLE #%d DIED (ITER #%d)", optim_curr_part,optim_curr_iteration);
-			psirt->particles[psirt->optim_curr_part]->status = DEAD;
+			psirt->particles[psirt->optim_curr_part].status = DEAD;
 			psirt->optim_curr_part++;
 		}
 	}
@@ -206,7 +206,7 @@ __device__ void optimization_check(PSIRT* psirt)
 		// OTIMIZACAO FALHOU (EXCEDEU MAX ITERACOES)
 		else {
 			//			printf("\r\n[OPTIM]\tPARTICLE #%d LIVED (ITER #%d)",optim_curr_part,optim_curr_iteration);
-			psirt->particles[psirt->optim_curr_part]->status = ALIVE; // NAO CONSEGUIU REMOVER
+			psirt->particles[psirt->optim_curr_part].status = ALIVE; // NAO CONSEGUIU REMOVER
 			psirt->optim_curr_part++;
 			psirt->is_optimizing_dirty_particle = 0;
 		}
@@ -219,7 +219,7 @@ __device__ int update_particles(PSIRT* psirt)
 	Vector2D resultant_force;
 	for (i = 0; i < psirt->n_particles; i++) {
 		printf("\r\ni=%d",i);
-		if (psirt->particles[i]->status != DEAD) {
+		if (psirt->particles[i].status != DEAD) {
 				
 			set(&resultant_force,0.0,0.0);
 			// calcular força resultante primeiro
@@ -227,17 +227,17 @@ __device__ int update_particles(PSIRT* psirt)
 			set(&resultant_vector,0.0,0.0);
 			for (j = 0; j < psirt->n_projections; j++) {
 				for (k = 0; k < psirt->n_trajectories; k++) {
-					resultant(psirt->projections[j]->lista_trajetorias[k],psirt->particles[i], &resultant_vector);
+					resultant(&(psirt->projections[j].lista_trajetorias[k]),&psirt->particles[i], &resultant_vector);
 					sum_void(&resultant_force, &resultant_vector, &resultant_force);
 				}
 
 			}
 #ifdef DEBUG_PRINT
-			printf("\r\nPART [%d] \t pos (%f, %f)", i, psirt->particles[i]->location.x, psirt->particles[i]->location.y );
+			printf("\r\nPART [%d] \t pos (%f, %f)", i, psirt->particles[i].location.x, psirt->particles[i].location.y );
 #endif
 			set(&resultant_force, -resultant_force.x, -resultant_force.y);
 
-			update_particle(psirt->particles[i], &resultant_force);
+			update_particle(&psirt->particles[i], &resultant_force);
 		}
 	}
 	return i;
@@ -250,15 +250,15 @@ void init_particles(PSIRT* psirt) {
 	//srand(time(NULL ));
 	int i = 0;
 	int lim = RAND_MAX / 2;
-	psirt->particles = (Particle**)malloc(sizeof(Particle) * psirt->n_particles);
+	psirt->particles = (Particle*)malloc(sizeof(Particle) * psirt->n_particles);
 	for (i = 0; i < psirt->n_particles; i++) {
-		psirt->particles[i] = new_particle();
-		psirt->particles[i]->location.x = rand() / (double) RAND_MAX;
-		psirt->particles[i]->location.y = rand() / (double) RAND_MAX;
+		psirt->particles[i] = *new_particle();
+		psirt->particles[i].location.x = rand() / (double) RAND_MAX;
+		psirt->particles[i].location.y = rand() / (double) RAND_MAX;
 		if (rand() > lim)
-			psirt->particles[i]->location.x = -psirt->particles[i]->location.x;
+			psirt->particles[i].location.x = -psirt->particles[i].location.x;
 		if (rand() > lim)
-			psirt->particles[i]->location.y = -psirt->particles[i]->location.y;
+			psirt->particles[i].location.y = -psirt->particles[i].location.y;
 	}
 
 }
@@ -283,7 +283,7 @@ void read_sinogram(PSIRT* psirt)
 			for (j=0;j<psirt->n_trajectories;j++)
 			{
 				fscanf (pFile, "%d", &n_parts);
-				psirt->projections[i]->lista_trajetorias[j]->n_particulas_estavel = n_parts;
+				psirt->projections[i].lista_trajetorias[j].n_particulas_estavel = n_parts;
 			}
 		}
 

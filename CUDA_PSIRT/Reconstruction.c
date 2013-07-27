@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include "PSIRT.cu"
+#include "CUDA_utils.cu"
 #include "bmpfile.h"
 
 #ifndef RES_X
@@ -40,14 +40,14 @@ double* reconstruction(PSIRT* psirt)
 	// Ajustar de acordo com o fator de escala.
 	// ---
 	for (i = 0; i < psirt->n_particles; i++) {
-		if ((psirt->particles[i]->location.x > -RECONSTRUCTION_SCALE_FACTOR)
-				&& (psirt->particles[i]->location.x < RECONSTRUCTION_SCALE_FACTOR)
-				&& (psirt->particles[i]->location.y > -RECONSTRUCTION_SCALE_FACTOR)
-				&& (psirt->particles[i]->location.y < RECONSTRUCTION_SCALE_FACTOR)) {
-			psirt->particles[i]->location.x += RECONSTRUCTION_SCALE_FACTOR;
-			psirt->particles[i]->location.y += RECONSTRUCTION_SCALE_FACTOR;
-			psirt->particles[i]->location.x /= 2 * RECONSTRUCTION_SCALE_FACTOR;
-			psirt->particles[i]->location.y /= 2 * RECONSTRUCTION_SCALE_FACTOR;
+		if ((psirt->particles[i].location.x > -RECONSTRUCTION_SCALE_FACTOR)
+				&& (psirt->particles[i].location.x < RECONSTRUCTION_SCALE_FACTOR)
+				&& (psirt->particles[i].location.y > -RECONSTRUCTION_SCALE_FACTOR)
+				&& (psirt->particles[i].location.y < RECONSTRUCTION_SCALE_FACTOR)) {
+			psirt->particles[i].location.x += RECONSTRUCTION_SCALE_FACTOR;
+			psirt->particles[i].location.y += RECONSTRUCTION_SCALE_FACTOR;
+			psirt->particles[i].location.x /= 2 * RECONSTRUCTION_SCALE_FACTOR;
+			psirt->particles[i].location.y /= 2 * RECONSTRUCTION_SCALE_FACTOR;
 		}
 	}
 	// ---
@@ -57,7 +57,7 @@ double* reconstruction(PSIRT* psirt)
 	Vector2D** scaled_particles = (Vector2D**) malloc(sizeof(Vector2D*) * psirt->n_particles);
 	for (i = 0; i < psirt->n_particles; i++) {
 		scaled_particles[i] = new_vector(0.0,0.0);
-		set(scaled_particles[i], psirt->particles[i]->location.x, psirt->particles[i]->location.y);
+		set(scaled_particles[i], psirt->particles[i].location.x, psirt->particles[i].location.y);
 		mult_constant_void(scaled_particles[i], RES_X);
 		//printf("\r\n ANTES: %f,%f \t DEPOIS: %f,%f",particles[i]->location->x, particles[i]->location->y,scaled_particles[i]->x,scaled_particles[i]->y  );
 	}
@@ -80,7 +80,7 @@ double* reconstruction(PSIRT* psirt)
 
 			// distancia para cada particula
 			for (part = 0; part < psirt->n_particles; part++) {
-				if (psirt->particles[part]->status != DEAD) {
+				if (psirt->particles[part].status != DEAD) {
 					// formato: x + ( y*RES_X )
 					float distance = vector_vector_distance(pixel,
 							scaled_particles[part]);
@@ -173,7 +173,7 @@ void draw_projection_bitmap(PSIRT* psirt)
 	{
 		for (j = 0; j < psirt->n_trajectories; j++)
 		{
-			Trajectory* t = psirt->projections[i]->lista_trajetorias[j];
+			Trajectory* t = &(psirt->projections[i].lista_trajetorias[j]);
 
 			Vector2D begin, end, d;
 			sum_void(&(t->source), &(t->direction), &begin);

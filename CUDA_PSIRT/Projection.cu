@@ -4,7 +4,7 @@
 
 // DATA STRUCTURES
 typedef struct {
-	Trajectory** lista_trajetorias;
+	Trajectory* lista_trajetorias;
 	int n_traj;
 } Projection;
 
@@ -19,7 +19,7 @@ __device__ int has_converged(Projection **p, int n_projections);
 __device__ int projection_stable(Projection *p)
 {
 	int i=0, stable = 0;
-	for (; i<p->n_traj; i++ ) stable += trajectory_stable(p->lista_trajetorias[i]);
+	for (; i<p->n_traj; i++ ) stable += trajectory_stable(&p->lista_trajetorias[i]);
 	if (stable==p->n_traj) return TRUE;
 	else return FALSE;
 }
@@ -37,7 +37,7 @@ Projection *new_parallel_projection(double angle, int ntraj, int* partptraj)
 	Projection *p = (Projection *)malloc(sizeof(Projection));
 
 	p->n_traj = ntraj;
-	p->lista_trajetorias = (Trajectory**) malloc(ntraj*sizeof(Trajectory));
+	p->lista_trajetorias = (Trajectory*) malloc(ntraj*sizeof(Trajectory));
 
 	Vector2D* director = new_vector(1.0f,0.0f);
 	RotateClockWise(director,angle);
@@ -62,7 +62,7 @@ Projection *new_parallel_projection(double angle, int ntraj, int* partptraj)
 		lerp(begin,end,coef,center);
 		Trajectory* traj = new_trajectory(*center,*director,partptraj[i]);
 
-		p->lista_trajetorias[i] = traj;
+		p->lista_trajetorias[i] = *traj;
 	}
 
 	free(ortogonal);

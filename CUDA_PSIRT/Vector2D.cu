@@ -33,18 +33,18 @@ Vector2D* clone(Vector2D* a);
 __host__ __device__ void set_vector(Vector2D* a, float x, float y);
 __host__ __device__ void sum_void(Vector2D* a, Vector2D* b, Vector2D* result);
 __host__ __device__ void minus_void(Vector2D* a, Vector2D* b, Vector2D* result);
-__device__ float dot_product(Vector2D* a, Vector2D* b);
-__device__ float magnitude(Vector2D* a);
-__device__ void mult_constant_void(Vector2D* a, float k);
-__device__ void normalize(Vector2D* a);
+__host__ __device__ float dot_product(Vector2D* a, Vector2D* b);
+__host__ __device__ float magnitude(Vector2D* a);
+__host__ __device__ void mult_constant_void(Vector2D* a, float k);
+__host__ __device__ void normalize(Vector2D* a);
 __host__ __device__ void set(Vector2D* v, float x, float y);
-__device__ void normalize_void(Vector2D* a);
-__device__ void copyTo(Vector2D* a, Vector2D* b);
-__device__ void RotateCounterClockWise(Vector2D* a, float angle);
-__device__ void RotateClockWise(Vector2D* a, float angle);
+__host__ __device__ void normalize_void(Vector2D* a);
+__host__ __device__ void copyTo(Vector2D* a, Vector2D* b);
+__host__ __device__ void RotateCounterClockWise(Vector2D* a, float angle);
+__host__ __device__ void RotateClockWise(Vector2D* a, float angle);
 __host__ __device__ float vector_vector_distance(Vector2D* a, Vector2D* b);
-__device__ void lerp(Vector2D* a, Vector2D* b, float t, Vector2D* c);
-__device__ float distance_point_line(Vector2D* point, Vector2D* line_a, Vector2D* line_b);
+__host__ __device__ void lerp(Vector2D* a, Vector2D* b, float t, Vector2D* c);
+__host__ __device__ float distance_point_line(Vector2D* point, Vector2D* line_a, Vector2D* line_b);
 
 
 __host__ __device__ void set_vector(Vector2D* a, float x, float y)
@@ -64,7 +64,7 @@ __host__ __device__ void minus_void(Vector2D* a, Vector2D* b, Vector2D* result)
 	result->y = a->y-b->y;
 }
 
-__device__ float dot_product(Vector2D* a, Vector2D* b)
+__host__ __device__ float dot_product(Vector2D* a, Vector2D* b)
 {
 	return (a->x*b->x + a->y*b->y);
 }
@@ -94,7 +94,7 @@ __host__ __device__ void normalize(Vector2D* a)
 	mult_constant_void(a,1/magnitude(a));
 }
 
-__device__ void normalize_void(Vector2D* a)
+__host__ __device__ void normalize_void(Vector2D* a)
 {
 	float constant = 1/magnitude(a);
 	mult_constant_void(a,constant);
@@ -108,7 +108,7 @@ Vector2D* clone(Vector2D* a)
 	return cloned;
 }
 
-__device__ void copyTo(Vector2D* a, Vector2D* b)
+__host__ __device__ void copyTo(Vector2D* a, Vector2D* b)
 {
 	b->x = a->x;
 	b->y = a->y;
@@ -151,7 +151,7 @@ __host__ __device__ void lerp(Vector2D* a, Vector2D* b, float t, Vector2D* c)
 	
 }
 
-__device__ float distance_point_line(Vector2D* point, Vector2D* line_a, Vector2D* line_b)
+__host__ __device__ float distance_point_line(Vector2D* point, Vector2D* line_a, Vector2D* line_b)
 {
 	float x0,y0,x1,y1,x2,y2;
 	x0 = point->x; y0 = point->y;

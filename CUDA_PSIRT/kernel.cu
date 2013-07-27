@@ -9,16 +9,6 @@
 
 #include <cuda_gl_interop.h>
 
-inline void GPUassert(cudaError_t code, char * file, int line, bool Abort=true)
-{
-    if (code != 0) {
-        fprintf(stderr, "GPUassert: %s %s %d\n", cudaGetErrorString(code),file,line);
-        if (Abort) exit(code);
-    }       
-}
-
-
-
 #define GPUerrchk(ans) { GPUassert((ans), __FILE__, __LINE__); }
 
 
@@ -57,7 +47,7 @@ void opengl_draw_configuration_lines(PSIRT* psirt)
 	{
 		for (j = 0; j < psirt->n_trajectories; j++)
 		{
-			Trajectory* t = psirt->projections[i]->lista_trajetorias[j];
+			Trajectory* t = &(psirt->projections[i].lista_trajetorias[j]);
 
 			Vector2D begin, end, d;
 			sum_void(&(t->source), &(t->direction), &begin);
@@ -86,12 +76,12 @@ void opengl_draw_particles(PSIRT* psirt)
 	glPointSize(7.0);
 	glBegin(GL_POINTS);
 	for (i = 0; i < psirt->n_particles; i++) {
-		if (psirt->particles[i]->status != DEAD) {
+		if (psirt->particles[i].status != DEAD) {
 			glColor3f(1.0, 0.0, 0.0);
-			glVertex2f(psirt->particles[i]->location.x, psirt->particles[i]->location.y);
+			glVertex2f(psirt->particles[i].location.x, psirt->particles[i].location.y);
 		} else {
 			glColor3f(0.0, 1.0, 0.0);
-			glVertex2f(psirt->particles[i]->location.x, psirt->particles[i]->location.y);
+			glVertex2f(psirt->particles[i].location.x, psirt->particles[i].location.y);
 		}
 		//printf("\r\n%d: \t%f,%f",i,psirt->particles[i]->location->x, psirt->particles[i]->location->y);
 	}
@@ -153,9 +143,38 @@ __global__ void ts(Vector2D* l)
 	printf("\r\nx=%f",l[0].x);
 }
 
-__global__ void test(Trajectory* t, Particle* p)
+__global__ void test(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_psirt, Projection* dev_proj)
 {
-	printf("\r\nPart = %d",t[0].n_particulas_atual);
+	//printf("\r\n===========\r\nSTARTUP CUDA PSIRT\r\n===========\r\nPARAMS:");
+	//printf("\t(#PROJ)\t(#TRAJ)\t(NPART)\r\n\t%d\t%d\t%d",dev_params[0], dev_params[1], dev_params[2]);
+
+	dev_psirt->particles = p;
+	
+	dev_psirt->n_projections = dev_params[0];
+	dev_psirt->n_trajectories = dev_params[1];
+	dev_psirt->n_particles = dev_params[2];
+
+	dev_psirt->is_optimized = 0;
+	dev_psirt->is_optimizing_dirty_particle = 0;
+
+	Projection *plist = dev_psirt->projections;
+
+	int i, j, k;
+	for (i=0, k=0; i<dev_psirt->n_projections; i++) 
+	{
+		plist[i].n_traj = dev_psirt->n_trajectories;
+
+		for (j=0; j<dev_psirt->n_trajectories; j++, k++) 
+		{
+			plist[i].lista_trajetorias[j] = t[k];
+		}
+		
+	}
+
+
+	printf("\r\n===========\r\nSTARTUP CUDA PSIRT\r\n===========\r\nPARAMS:");
+	printf("\t(#PROJ)\t(#TRAJ)\t(NPART)\r\n\t%d\t%d\t%d",dev_psirt->n_projections, dev_psirt->projections[0].n_traj, dev_psirt->n_particles);
+
 }
 
 void test_psirt(PSIRT* host_psirt)
@@ -177,11 +196,11 @@ void test_psirt(PSIRT* host_psirt)
 	
 	for (i=0,k=0; i<n_proj; i++) 
 	{
-		Projection *p = host_psirt->projections[i];
+		Projection p = host_psirt->projections[i];
 
 		for (j=0; j< n_traj; j++,k++)
 		{
-			Trajectory t = *p->lista_trajetorias[j];
+			Trajectory t = (p.lista_trajetorias[j]);
 			
 			GPUerrchk(cudaMemcpy(&(traj[k]), &t, sizeof(Trajectory), cudaMemcpyHostToDevice));
 		}
@@ -198,103 +217,29 @@ void test_psirt(PSIRT* host_psirt)
 
 	for (i=0; i<n_part; i++)
 	{
-		Particle hp = *host_psirt->particles[i];
+		Particle hp = host_psirt->particles[i];
 		GPUerrchk(cudaMemcpy(&(part[i]), &hp, sizeof(Particle), cudaMemcpyHostToDevice));
 	}
 
-	test<<<1,1>>>(traj, part);
-
+	// 3. DEMAIS PARAMETROS
+	int params[] = {n_proj, n_traj, n_part};
+	int *dev_params;
+	GPUerrchk(cudaMalloc((void**)&dev_params, sizeof(int)*3));
+	GPUerrchk(cudaMemcpy(dev_params,params,sizeof(int)*3,cudaMemcpyHostToDevice));
 
 	
 	// 3. REMONTAR PARAMETROS
+	PSIRT* dev_psirt;
+	Projection* dev_proj;
+	GPUerrchk(cudaMalloc((void**)&dev_psirt, sizeof(PSIRT)));
+	GPUerrchk(cudaMalloc((void**)&dev_proj, sizeof(Projection)*n_proj));
 
-	
+	test<<<1,1>>>(traj, part, dev_params, dev_psirt, dev_proj);
 
 
 
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-void prep_psirt() 
-{
-	cudaError_t cudaStatus;
-
-	PSIRT* host_psirt = init_psirt();
-
-	
-	if (cudaStatus != cudaSuccess) fprintf(stderr, "cudaMalloc failed!");
-
-
-	  //Sending Side
-    char b[sizeof(PSIRT)];
-    memcpy(b, &host_psirt, sizeof(PSIRT));
-
-    //Receiving Side
-    PSIRT* tmp; //Re-make the struct
-	//cudaMalloc((void**)&tmp, sizeof(PSIRT));
-	//cudaMemcpy(tmp, b, sizeof(PSIRT), cudaMemcpyHostToDevice);
-
-
-	//psirt_kernel<<<1,1>>>(tmp, dev_projections);
-
-/*	// 1. INICIALIZAR (HOST)
-	PSIRT* host_psirt = init_psirt();
-
-	// 2. COPIAR (HOST->DEV)			---- CHECAR!!!!!!!!!!
-
-
-
-	// TEMP --------------
-	size_t size_proj = sizeof(host_psirt->n_projections)*sizeof(Projection);
-	size_t size_part = sizeof(host_psirt->n_particles  )*sizeof(Particle);
-
-	cudaMalloc((void**)&dev_projections, size_proj );
-	cudaMalloc((void**)&dev_particles,	size_part );
-
-	int k = 0;
-	for(k=0;k<1;k++)
-		cudaMemcpy(dev_projections[k], host_psirt->projections[k], sizeof(Projection), cudaMemcpyHostToDevice);
-	
-	
-	cudaMemcpy(dev_particles,	host_psirt->particles,	 size_part, cudaMemcpyHostToDevice);
-	// TEMP --------------
-
-
-
-	cudaMalloc((void**)&dev_psirt, sizeof(PSIRT));
-	cudaMemcpy(dev_psirt, host_psirt, sizeof(PSIRT), cudaMemcpyHostToDevice);
-
-
-	//dev_psirt->projections = dev_projections;
-	//dev_psirt->particles	= dev_particles;
-
-
-	// 3. EXECUTAR (DEV)
-	psirt_kernel<<<1,1>>>(dev_psirt, dev_projections);
-	cudaDeviceSynchronize();
-
-	// 4. COPIAR (DEV->HOST)
-	cudaMemcpy(host_psirt, dev_psirt, sizeof(PSIRT), cudaMemcpyDeviceToHost);
-	cudaFree(dev_psirt);
-
-	// 5. RECONSTRUCAO (HOST)
-	draw_projection_bitmap(host_psirt);
-	draw_reconstruction_bitmap(host_psirt);
-	
-	free(host_psirt);*/
-}
 
 
 
