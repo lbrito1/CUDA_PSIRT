@@ -13,7 +13,8 @@ void init_proj(Projection* p, double angle, int ntraj, int* partptraj);
 
 // DEVICE FUNCTIONS
 __device__ int projection_stable(Projection *p, int n_traj);
-__device__ int has_converged(Projection **p, int n_projections, int n_trajectories);
+
+__device__ int has_converged(Trajectory *t, int n_ttl_traj);
 
 // IMPLEMENTATION
 __device__ int projection_stable(Projection *p, int n_traj)
@@ -24,11 +25,11 @@ __device__ int projection_stable(Projection *p, int n_traj)
 	else return FALSE;
 }
 
-__device__ int has_converged(Projection **p, int n_projections, int n_trajectories)
+__device__ int has_converged(Trajectory *t, int n_ttl_traj)
 {
 	int i=0, stable = 0;
-	for (;i<n_projections;i++) stable += projection_stable(p[i], n_trajectories);
-	if (stable==n_projections) return TRUE;
+	for (;i<n_ttl_traj;i++) stable += trajectory_stable(&t[i]);
+	if (stable==n_ttl_traj) return TRUE;
 	else return FALSE;
 }
 

@@ -167,13 +167,14 @@ int draw_reconstruction_bitmap(PSIRT *psirt) {
 void draw_projection_bitmap(PSIRT* psirt)
 {
 	bmpfile_t *bmp_proj = bmp_create(RES_X, RES_Y, 24);
-
-	int i, j;
-	for (i = 0; i < psirt->n_projections; i++)
+	//printf("\r\n\r\nDRAW PROJ BITMAP\r\n");
+	int i, j, k;
+	for (i = 0, k=0; i < psirt->n_projections; i++)
 	{
-		for (j = 0; j < psirt->n_trajectories; j++)
+		for (j = 0; j < psirt->n_trajectories; j++, k++)
 		{
-			Trajectory* t = &(psirt->projections[i].lista_trajetorias[j]);
+			Trajectory* t = &(psirt->trajectories[k]);
+			//printf("\r\nTRAJ #%d\t%f,%f\t%f,%f",k,t->source.x,t->source.y,t->direction.x,t->direction.y);
 
 			Vector2D begin, end, d;
 			sum_void(&(t->source), &(t->direction), &begin);

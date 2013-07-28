@@ -47,7 +47,7 @@ void opengl_draw_configuration_lines(PSIRT* psirt)
 	{
 		for (j = 0; j < psirt->n_trajectories; j++)
 		{
-			Trajectory* t = &(psirt->projections[i].lista_trajetorias[j]);
+			Trajectory* t = &(psirt->trajectories[(i*psirt->n_projections)+j]);
 
 			Vector2D begin, end, d;
 			sum_void(&(t->source), &(t->direction), &begin);
@@ -157,19 +157,7 @@ __global__ void test(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_psi
 	dev_psirt->is_optimized = 0;
 	dev_psirt->is_optimizing_dirty_particle = 0;
 
-	Projection *plist = dev_psirt->projections;
-
-	int i, j, k;
-	for (i=0, k=0; i<dev_psirt->n_projections; i++) 
-	{
-		//plist[i].n_traj = dev_psirt->n_trajectories;
-
-		for (j=0; j<dev_psirt->n_trajectories; j++, k++) 
-		{
-		//	plist[i].lista_trajetorias[j] = t[k];
-		}
-		
-	}
+	
 
 
 	printf("\r\n===========\r\nSTARTUP CUDA PSIRT\r\n===========\r\nPARAMS:");
@@ -196,11 +184,11 @@ void test_psirt(PSIRT* host_psirt)
 	
 	for (i=0,k=0; i<n_proj; i++) 
 	{
-		Projection p = host_psirt->projections[i];
+		
 
 		for (j=0; j< n_traj; j++,k++)
 		{
-			Trajectory t = (p.lista_trajetorias[j]);
+			Trajectory t = (host_psirt->trajectories[(i*host_psirt->n_projections)+j]);
 			
 			GPUerrchk(cudaMemcpy(&(traj[k]), &t, sizeof(Trajectory), cudaMemcpyHostToDevice));
 		}

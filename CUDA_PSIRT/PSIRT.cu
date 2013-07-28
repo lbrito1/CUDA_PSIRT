@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #define DEBUG_PRINT
 typedef struct {
-	Projection* projections;
+	Trajectory* trajectories;
 	Particle* particles;
 
 	int n_projections;
@@ -116,13 +116,13 @@ __device__ int run_psirt(PSIRT* psirt)
 	for (i=0;i<psirt->n_particles;i++) psirt->particles[i].current_trajectories = 0; 	// zera #traj de cada particula
 	for (i=0;i<psirt->n_projections;i++) 											// calcula #traj de cada particula
 		for (j=0;j<psirt->n_trajectories;j++)
-			update_trajectory(&(psirt->projections[i].lista_trajetorias[j]), &psirt->particles, psirt->n_particles);
+			update_trajectory(&(psirt->trajectories[(i*psirt->n_projections)+j]), &psirt->particles, psirt->n_particles);
 
 	// ---------------------------
 	// *** OTIMIZACAO E CONVERGENCIA ***
 	// ---------------------------
 	optimization_check(psirt);													// otimizacao (continuar)
-	if (has_converged(&psirt->projections,psirt->n_projections,psirt->n_trajectories))							// convergiu
+	if (has_converged(psirt->trajectories,psirt->n_projections*psirt->n_trajectories))							// convergiu
 	{
 		if (psirt->optim_curr_part < psirt->n_particles) optimize(psirt);						// otimizacao (comecar)
 		else return 0;	// DONE
@@ -227,7 +227,7 @@ __device__ int update_particles(PSIRT* psirt)
 			set(&resultant_vector,0.0,0.0);
 			for (j = 0; j < psirt->n_projections; j++) {
 				for (k = 0; k < psirt->n_trajectories; k++) {
-					resultant(&(psirt->projections[j].lista_trajetorias[k]),&psirt->particles[i], &resultant_vector);
+					resultant(&(psirt->trajectories[(i*psirt->n_projections)+j]),&psirt->particles[i], &resultant_vector);
 					sum_void(&resultant_force, &resultant_vector, &resultant_force);
 				}
 
@@ -267,7 +267,10 @@ void init_particles(PSIRT* psirt) {
 void read_sinogram(PSIRT* psirt)
 {
 	int n_parts;
+	int ttl_traj = psirt->n_projections * psirt->n_trajectories;
 	FILE * pFile;
+
+	Projection *ptemp;
 	
 	pFile = fopen ("sinograma.txt","r");
 	if (pFile != NULL) 
@@ -275,20 +278,36 @@ void read_sinogram(PSIRT* psirt)
 		
 		fscanf (pFile, "%d", &psirt->n_projections);
 		fscanf (pFile, "%d", &psirt->n_trajectories);
-		psirt->projections = new_parallel_projections(psirt->n_projections,psirt->n_trajectories, get_dummy_particle_per_projection_trajectory(psirt->n_projections,psirt->n_trajectories,4));
+		ptemp = new_parallel_projections(psirt->n_projections,psirt->n_trajectories, get_dummy_particle_per_projection_trajectory(psirt->n_projections,psirt->n_trajectories,4));
 
-		int i=0,j=0;
+		int i=0,j=0, k=0;
 		for (i=0;i<psirt->n_projections;i++)
 		{
 			for (j=0;j<psirt->n_trajectories;j++)
 			{
 				fscanf (pFile, "%d", &n_parts);
-				psirt->projections[i].lista_trajetorias[j].n_particulas_estavel = n_parts;
+				ptemp[i].lista_trajetorias[j].n_particulas_estavel = n_parts;
 			}
 		}
 
 		fscanf (pFile, "%d", &psirt->n_particles);
 		fclose (pFile);
+
+		int ttl_traj = (psirt->n_projections * psirt->n_trajectories);
+
+		psirt->trajectories = (Trajectory*) malloc(sizeof(Trajectory) * ttl_traj);
+		printf("\r\n\r\nREADING SINOGRAM\r\n");
+
+		
+		for (k=0,i=0;i<psirt->n_projections;i++)
+		{
+			for (j=0;j<psirt->n_trajectories;j++, k++)
+			{
+				memcpy(&(psirt->trajectories[k]), &(ptemp[i].lista_trajetorias[j]), sizeof(Trajectory));
+				Trajectory t = psirt->trajectories[k];
+				printf("\r\nTRAJ #%d\t%f,%f\t%f,%f",k,t.source.x,t.source.y,t.direction.x,t.direction.y);
+			}
+		}
 	}
 	else
 	{
