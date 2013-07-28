@@ -1,7 +1,7 @@
 #include "ProjectionController.cu"
 #include <cstdio>
 #include <stdlib.h>
-#define DEBUG_PRINT
+
 typedef struct {
 	Trajectory* trajectories;
 	Particle* particles;
@@ -116,7 +116,7 @@ __device__ int run_psirt(PSIRT* psirt)
 	for (i=0;i<psirt->n_particles;i++) psirt->particles[i].current_trajectories = 0; 	// zera #traj de cada particula
 	for (i=0;i<psirt->n_projections;i++) 											// calcula #traj de cada particula
 		for (j=0;j<psirt->n_trajectories;j++)
-			update_trajectory(&(psirt->trajectories[(i*psirt->n_projections)+j]), &psirt->particles, psirt->n_particles);
+			update_trajectory(psirt->trajectories[(i*psirt->n_projections)+j], psirt->particles, psirt->n_particles);
 
 	// ---------------------------
 	// *** OTIMIZACAO E CONVERGENCIA ***
@@ -149,9 +149,13 @@ __device__ void optimize(PSIRT* psirt)
 			{
 				if (psirt->particles[j].current_trajectories
 						> psirt->particles[i].current_trajectories) {
-					memcpy(&temp, &psirt->particles[j], sizeof(Particle));
-					memcpy(&psirt->particles[j], &psirt->particles[i], sizeof(Particle));
-					memcpy(&psirt->particles[i], &temp, sizeof(Particle));
+				//	temp = psirt->particles[j];
+				//	psirt->particles[j] = psirt->particles[i];
+				//	psirt->particles[i] = temp;
+
+					//memcpy(&temp, &psirt->particles[j], sizeof(Particle));
+					//memcpy(&psirt->particles[j], &psirt->particles[i], sizeof(Particle));
+					//memcpy(&psirt->particles[i], &temp, sizeof(Particle));
 				}
 			}
 		}
@@ -164,7 +168,6 @@ __device__ void optimize(PSIRT* psirt)
 	// ---------------------------
 	if (psirt->particles[psirt->optim_curr_part].current_trajectories == 0)
 	{
-		//printf("\r\n[OPTIM]\tPARTICLE #%d DIED (0 TRAJ)", optim_curr_part);
 		psirt->is_optimizing_dirty_particle = 0;
 		psirt->particles[psirt->optim_curr_part].status = DEAD;
 		psirt->optim_curr_part++;
@@ -187,7 +190,6 @@ __device__ void optimize(PSIRT* psirt)
 		// PARTICULA CHECADA & CONVERGIU -> REMOVER
 		else if (psirt->particles[psirt->optim_curr_part].status == CHECKING)
 		{
-			//printf("\r\n[OPTIM]\tPARTICLE #%d DIED (ITER #%d)", optim_curr_part,optim_curr_iteration);
 			psirt->particles[psirt->optim_curr_part].status = DEAD;
 			psirt->optim_curr_part++;
 		}

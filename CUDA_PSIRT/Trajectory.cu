@@ -60,7 +60,7 @@ __device__ Vector2D* projection(Vector2D* p, Trajectory* t);
 __device__ int current_status(Trajectory* t);
 __device__ float trajectory_force(Trajectory* t);
 __device__ inline void resultant(Trajectory *t, Particle* p, Vector2D *resultant);
-__device__ void update_trajectory(Trajectory *t, Particle **p, int nparticle);
+__device__ void update_trajectory(Trajectory t, Particle *p, int nparticle);
 __device__ inline void directionFrom(Vector2D *point, Trajectory *t, Vector2D *direction);
 
 
@@ -133,22 +133,22 @@ __device__ inline void directionFrom(Vector2D *point, Trajectory *t, Vector2D *d
 	//	return new_vector(u->x - projuv->x, u->y - projuv->y);
 }
 
-__device__ void update_trajectory(Trajectory *t, Particle **p, int nparticle)
+__device__ void update_trajectory(Trajectory t, Particle *p, int nparticle)
 {
-	t->n_particulas_atual = 0;
+	t.n_particulas_atual = 0;
 
 	int i=0;
-	for (i=0;i<nparticle;i++)
+	for (i=0; i<nparticle; i++)
 	{
-		if (p[i]->status == ALIVE)
+		if (p[i].status == ALIVE)
 		{
 			// Find distance from point to line segment (orthogonal)
-			float distance_point_line = distance(&p[i]->location,t);
+			float distance_point_line = distance(&p[i].location,&t);
 
 			if (distance_point_line<TRAJ_PART_THRESHOLD)
 			{
-				t->n_particulas_atual++;
-				p[i]->current_trajectories++;
+				t.n_particulas_atual++;
+				p[i].current_trajectories++;
 			}
 		}
 	}
