@@ -143,12 +143,13 @@ __global__ void ts(Vector2D* l)
 	printf("\r\nx=%f",l[0].x);
 }
 
-__global__ void test(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_psirt, Projection* dev_proj)
+__global__ void test(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_psirt)
 {
 	//printf("\r\n===========\r\nSTARTUP CUDA PSIRT\r\n===========\r\nPARAMS:");
 	//printf("\t(#PROJ)\t(#TRAJ)\t(NPART)\r\n\t%d\t%d\t%d",dev_params[0], dev_params[1], dev_params[2]);
 
 	dev_psirt->particles = p;
+	dev_psirt->trajectories = t;
 	
 	dev_psirt->n_projections = dev_params[0];
 	dev_psirt->n_trajectories = dev_params[1];
@@ -157,12 +158,38 @@ __global__ void test(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_psi
 	dev_psirt->is_optimized = 0;
 	dev_psirt->is_optimizing_dirty_particle = 0;
 
-	
-
-
 	printf("\r\n===========\r\nSTARTUP CUDA PSIRT\r\n===========\r\nPARAMS:");
-	printf("\t(#PROJ)\t(#TRAJ)\t(NPART)\r\n\t%d\t%d\t%d",dev_psirt->n_projections, dev_psirt->n_trajectories, dev_psirt->n_particles);
+	printf("\t(#PROJ)\t(#TRAJ)\t(NPART)\r\n\t%d\t%d\t%d\r\n\r\n",dev_psirt->n_projections, dev_psirt->n_trajectories, dev_psirt->n_particles);
 
+	int done = 0;
+	int lim = 0;
+	while (!done&(++lim<100))
+	{
+		printf("a");
+			// ---------------------------
+		// *** ATUALIZAR POSICOES DAS PARTICULAS ***
+		// ---------------------------
+		update_particles(dev_psirt);
+
+		// ---------------------------
+		// *** CALCULO DE TRAJETORIAS SATISFEITAS ***
+		// ---------------------------
+		////int i=0,j=0;
+		//for (i=0;i<dev_psirt->n_particles;i++) dev_psirt->particles[i].current_trajectories = 0; 	// zera #traj de cada particula
+		//for (i=0;i<dev_psirt->n_projections*dev_psirt->n_trajectories; i++) 	;										// calcula #traj de cada particula
+		//	update_trajectory(&(dev_psirt->trajectories[i]), &dev_psirt->particles, dev_psirt->n_particles);
+
+		// ---------------------------
+		// *** OTIMIZACAO E CONVERGENCIA ***
+		// ---------------------------
+		//optimization_check(dev_psirt);													// otimizacao (continuar)
+		//if (has_converged(dev_psirt->trajectories,dev_psirt->n_projections*dev_psirt->n_trajectories))							// convergiu
+		//{
+		//	if (dev_psirt->optim_curr_part < dev_psirt->n_particles) optimize(dev_psirt);						// otimizacao (comecar)
+		//	else done = 1;	// DONE
+		//}
+//	return 0;	// NOT DONE
+	}
 }
 
 void test_psirt(PSIRT* host_psirt)
@@ -220,9 +247,8 @@ void test_psirt(PSIRT* host_psirt)
 	PSIRT* dev_psirt;
 	Projection* dev_proj;
 	GPUerrchk(cudaMalloc((void**)&dev_psirt, sizeof(PSIRT)));
-	GPUerrchk(cudaMalloc((void**)&dev_proj, sizeof(Projection)*n_proj));
 
-	test<<<1,1>>>(traj, part, dev_params, dev_psirt, dev_proj);
+	test<<<1,1>>>(traj, part, dev_params, dev_psirt);
 
 
 

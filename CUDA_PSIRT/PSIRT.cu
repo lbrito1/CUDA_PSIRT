@@ -218,19 +218,15 @@ __device__ int update_particles(PSIRT* psirt)
 	int i=0,j=0,k=0;
 	Vector2D resultant_force;
 	for (i = 0; i < psirt->n_particles; i++) {
-		printf("\r\ni=%d",i);
 		if (psirt->particles[i].status != DEAD) {
 				
 			set(&resultant_force,0.0,0.0);
 			// calcular força resultante primeiro
 			Vector2D resultant_vector;
 			set(&resultant_vector,0.0,0.0);
-			for (j = 0; j < psirt->n_projections; j++) {
-				for (k = 0; k < psirt->n_trajectories; k++) {
-					resultant(&(psirt->trajectories[(i*psirt->n_projections)+j]),&psirt->particles[i], &resultant_vector);
-					sum_void(&resultant_force, &resultant_vector, &resultant_force);
-				}
-
+			for (j = 0; j < psirt->n_projections * psirt->n_trajectories; j++) {
+				resultant(&(psirt->trajectories[j]),&psirt->particles[i], &resultant_vector);
+				sum_void(&resultant_force, &resultant_vector, &resultant_force);
 			}
 #ifdef DEBUG_PRINT
 			printf("\r\nPART [%d] \t pos (%f, %f)", i, psirt->particles[i].location.x, psirt->particles[i].location.y );
