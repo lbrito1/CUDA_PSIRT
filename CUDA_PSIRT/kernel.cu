@@ -89,43 +89,29 @@ __global__ void test(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_psi
 
 void test_psirt(PSIRT* host_psirt)
 {
-
-	// 1: COPIAR PROJEÇÕES/TRAJETÓRIAS
+	// 1: COPIAR PROJEÇÕES/TRAJETÓRIAS/PARTÍCULAS
 	
 	int n_proj = host_psirt->n_projections;
 	int n_traj = host_psirt->n_trajectories;
 	int n_ttl_traj = n_proj * n_traj;
-	
-	int ttl_traj_len = n_proj * n_traj;
-	size_t ttl_traj_size = sizeof(Trajectory) * ttl_traj_len;
-
-	Trajectory* traj;
-	GPUerrchk(cudaMalloc((void**)&traj, ttl_traj_size));
-
-	int i,j,k;
-	
-	GPUerrchk(cudaMemcpy(traj, host_psirt->trajectories, sizeof(Trajectory) * ttl_traj_len, cudaMemcpyHostToDevice));
-
-
-	// 2. COPIAR PARTÍCULAS
-
 	int n_part = host_psirt->n_particles;
-	int ttl_part_size = sizeof(Particle) * n_part;
+	
+	Trajectory* traj;
+	GPUerrchk(cudaMalloc((void**)&traj, sizeof(Trajectory) * n_ttl_traj));
+	GPUerrchk(cudaMemcpy(traj, host_psirt->trajectories, sizeof(Trajectory) * n_ttl_traj, cudaMemcpyHostToDevice));
 
 	Particle *part;
-	GPUerrchk(cudaMalloc((void**)&part, ttl_part_size));
+	GPUerrchk(cudaMalloc((void**)&part, n_part * sizeof(Particle)));
 	GPUerrchk(cudaMemcpy(part, host_psirt->particles, sizeof(Particle) * n_part, cudaMemcpyHostToDevice));
 
-	// 3. DEMAIS PARAMETROS
+	// 2. PARAMETROS AUXILIARES
 	int params[] = {n_proj, n_traj, n_part};
 	int *dev_params;
 	GPUerrchk(cudaMalloc((void**)&dev_params, sizeof(int)*3));
 	GPUerrchk(cudaMemcpy(dev_params,params,sizeof(int)*3,cudaMemcpyHostToDevice));
-
 	
-	// 3. REMONTAR PARAMETROS
+	// 3. EXECUTAR
 	PSIRT* dev_psirt;
-	Projection* dev_proj;
 	GPUerrchk(cudaMalloc((void**)&dev_psirt, sizeof(PSIRT)));
 
 	test<<<1,1>>>(traj, part, dev_params, dev_psirt);
