@@ -194,30 +194,14 @@ __global__ void test(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_psi
 		// ---------------------------
 		// *** OTIMIZACAO E CONVERGENCIA ***
 		// ---------------------------
-		//optimization_check(dev_psirt);													// otimizacao (continuar)
-			// pre-update otimizacao
-		/*if (is_optimizing_dirty_particle) {
-			// OTIMIZANDO
-			if (dev_psirt->optim_curr_iteration < dev_psirt->optim_max_iterations) {
-				dev_psirt->optim_curr_iteration++;
-			}
-			// OTIMIZACAO FALHOU (EXCEDEU MAX ITERACOES)
-			else {
-				//			printf("\r\n[OPTIM]\tPARTICLE #%d LIVED (ITER #%d)",optim_curr_part,optim_curr_iteration);
-				dev_psirt->particles[dev_psirt->optim_curr_part].status = ALIVE; // NAO CONSEGUIU REMOVER
-				dev_psirt->optim_curr_part++;
-				dev_psirt->is_optimizing_dirty_particle = 0;
-			}
-		}*/
+		optimization_check(dev_psirt);													// otimizacao (continuar)
 
-
-
-	//	if (has_converged(dev_psirt->trajectories,dev_psirt->n_projections*dev_psirt->n_trajectories))							// convergiu
-	//	{
-			//if (dev_psirt->optim_curr_part < dev_psirt->n_particles) optimize(dev_psirt);						// otimizacao (comecar)
-			//else done = 1;	// DONE 
+		if (has_converged(dev_psirt->trajectories,dev_psirt->n_projections*dev_psirt->n_trajectories))							// convergiu
+		{
+			if (dev_psirt->optim_curr_part < dev_psirt->n_particles) optimize(dev_psirt);						// otimizacao (comecar)
+			else done = 1;	// DONE 
 		//	done = 1;
-		//}
+		}
 //	return 0;	// NOT DONE
 	}
 }
