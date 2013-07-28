@@ -245,7 +245,7 @@ __device__ int update_particles(PSIRT* psirt)
 // *** INICIALIZAR PARTICULAS ***
 // ---------------------------
 void init_particles(PSIRT* psirt) {
-	//srand(time(NULL ));
+	srand(time(NULL ));
 	int i = 0;
 	int lim = RAND_MAX / 2;
 	psirt->particles = (Particle*)malloc(sizeof(Particle) * psirt->n_particles);
