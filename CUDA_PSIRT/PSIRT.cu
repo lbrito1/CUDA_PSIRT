@@ -122,7 +122,7 @@ __device__ int run_psirt(PSIRT* psirt)
 	// *** OTIMIZACAO E CONVERGENCIA ***
 	// ---------------------------
 	optimization_check(psirt);													// otimizacao (continuar)
-	if (has_converged(&psirt->projections,psirt->n_projections))							// convergiu
+	if (has_converged(&psirt->projections,psirt->n_projections,psirt->n_trajectories))							// convergiu
 	{
 		if (psirt->optim_curr_part < psirt->n_particles) optimize(psirt);						// otimizacao (comecar)
 		else return 0;	// DONE

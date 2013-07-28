@@ -162,18 +162,18 @@ __global__ void test(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_psi
 	int i, j, k;
 	for (i=0, k=0; i<dev_psirt->n_projections; i++) 
 	{
-		plist[i].n_traj = dev_psirt->n_trajectories;
+		//plist[i].n_traj = dev_psirt->n_trajectories;
 
 		for (j=0; j<dev_psirt->n_trajectories; j++, k++) 
 		{
-			plist[i].lista_trajetorias[j] = t[k];
+		//	plist[i].lista_trajetorias[j] = t[k];
 		}
 		
 	}
 
 
 	printf("\r\n===========\r\nSTARTUP CUDA PSIRT\r\n===========\r\nPARAMS:");
-	printf("\t(#PROJ)\t(#TRAJ)\t(NPART)\r\n\t%d\t%d\t%d",dev_psirt->n_projections, dev_psirt->projections[0].n_traj, dev_psirt->n_particles);
+	printf("\t(#PROJ)\t(#TRAJ)\t(NPART)\r\n\t%d\t%d\t%d",dev_psirt->n_projections, dev_psirt->n_trajectories, dev_psirt->n_particles);
 
 }
 
