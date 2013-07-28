@@ -104,14 +104,7 @@ void test_psirt(PSIRT* host_psirt)
 
 	int i,j,k;
 	
-	for (i=0,k=0; i<n_proj; i++) 
-	{
-		for (j=0; j< n_traj; j++,k++)
-		{
-			Trajectory t = (host_psirt->trajectories[(i*host_psirt->n_projections)+j]);
-			GPUerrchk(cudaMemcpy(&(traj[k]), &t, sizeof(Trajectory), cudaMemcpyHostToDevice));
-		}
-	}
+	GPUerrchk(cudaMemcpy(traj, host_psirt->trajectories, sizeof(Trajectory) * ttl_traj_len, cudaMemcpyHostToDevice));
 
 
 	// 2. COPIAR PARTÍCULAS
@@ -121,12 +114,7 @@ void test_psirt(PSIRT* host_psirt)
 
 	Particle *part;
 	GPUerrchk(cudaMalloc((void**)&part, ttl_part_size));
-
-	for (i=0; i<n_part; i++)
-	{
-		Particle hp = host_psirt->particles[i];
-		GPUerrchk(cudaMemcpy(&(part[i]), &hp, sizeof(Particle), cudaMemcpyHostToDevice));
-	}
+	GPUerrchk(cudaMemcpy(part, host_psirt->particles, sizeof(Particle) * n_part, cudaMemcpyHostToDevice));
 
 	// 3. DEMAIS PARAMETROS
 	int params[] = {n_proj, n_traj, n_part};
