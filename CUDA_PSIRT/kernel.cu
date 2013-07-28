@@ -6,27 +6,16 @@
 #include <windows.h>
 #include <time.h>
 
-
 #define GPUerrchk(ans) { GPUassert((ans), __FILE__, __LINE__); }
-
 
 //gambiarra
 //#define DEBUG_PRINT
 
-void prep_psirt();
-void display();
-void test_psirt();
+__global__ void run_cuda_psirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_psirt);
 
-__global__ void psirt_kernel(PSIRT* psirt, Projection** dev_proj);
+void cuda_psirt(PSIRT* host_psirt);
 
-PSIRT *debug_host_psirt;
-PSIRT *dev_psirt;
-
-Projection**	dev_projections;
-Particle**		dev_particles;
-
-
-__global__ void test(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_psirt)
+__global__ void run_cuda_psirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_psirt)
 {
 	//printf("\r\n===========\r\nSTARTUP CUDA PSIRT\r\n===========\r\nPARAMS:");
 	//printf("\t(#PROJ)\t(#TRAJ)\t(NPART)\r\n\t%d\t%d\t%d",dev_params[0], dev_params[1], dev_params[2]);
@@ -87,7 +76,7 @@ __global__ void test(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_psi
 	}
 }
 
-void test_psirt(PSIRT* host_psirt)
+void cuda_psirt(PSIRT* host_psirt)
 {
 	// 1: COPIAR PROJEÇÕES/TRAJETÓRIAS/PARTÍCULAS
 	
@@ -114,7 +103,7 @@ void test_psirt(PSIRT* host_psirt)
 	PSIRT* dev_psirt;
 	GPUerrchk(cudaMalloc((void**)&dev_psirt, sizeof(PSIRT)));
 
-	test<<<1,1>>>(traj, part, dev_params, dev_psirt);
+	run_cuda_psirt<<<1,1>>>(traj, part, dev_params, dev_psirt);
 
 	// 4. COPIAR DE VOLTA
 	Particle *host_plist = host_psirt->particles;
@@ -130,7 +119,7 @@ int main(int argc, char* argv[])
 	PSIRT* host_psirt = init_psirt();	
 
 	// Passar parâmetros para device, executar & copiar de volta para host
-	test_psirt(host_psirt);
+	cuda_psirt(host_psirt);
 	
 	// Gerar bitmaps
 	draw_projection_bitmap(host_psirt);
