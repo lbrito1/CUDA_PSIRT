@@ -176,7 +176,7 @@ __global__ void test(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_psi
 	int lim = 0;
 
 
-	while (!done&(++lim<100))
+	while (!done&(++lim<1000))
 	{
 			// ---------------------------
 		// *** ATUALIZAR POSICOES DAS PARTICULAS ***
