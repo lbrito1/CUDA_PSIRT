@@ -149,34 +149,21 @@ void test_psirt(PSIRT* host_psirt)
 
 int main(int argc, char* argv[])
 {
-	cudaError_t cudaStatus;
+	// Inicializar CUDA
+	GPUerrchk(cudaSetDevice(0));
 
+	// Preparar parâmetros no host
 	PSIRT* host_psirt = init_psirt();	
-	cudaError_t cuda_status = cudaSetDevice(0);
-	if (cuda_status != cudaSuccess) printf("\r\n cuInit failed");
 
-	//prep_psirt(); // CUDA
-
+	// Passar parâmetros para device, executar & copiar de volta para host
 	test_psirt(host_psirt);
-
-    
-	//printf("\r\nOK!");
-	//scanf("%d");
-
-    // cudaDeviceReset must be called before exiting in order for profiling and
-    // tracing tools such as Nsight and Visual Profiler to show complete traces.
-    cudaStatus = cudaDeviceReset();
-	if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaDeviceReset failed!");
-        return 1;
-    }
 	
-
-
+	// Gerar bitmaps
 	draw_projection_bitmap(host_psirt);
 	draw_reconstruction_bitmap(host_psirt);
 	
+	// Limpeza & finalização
 	free(host_psirt);
-
+	GPUerrchk(cudaDeviceReset());
     return 0;
 }
