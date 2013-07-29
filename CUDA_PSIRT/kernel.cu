@@ -17,6 +17,8 @@ void cuda_psirt(PSIRT* host_psirt);
 
 __global__ void run_cuda_psirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_psirt)
 {
+	 int index = blockIdx.x * blockDim.x + threadIdx.x;
+
 	dev_psirt->particles = p;
 	dev_psirt->trajectories = t;
 	
@@ -40,17 +42,34 @@ __global__ void run_cuda_psirt(Trajectory* t, Particle* p, int* dev_params, PSIR
 	int done = 0;
 	int lim = 0;
 
-	while (!done&(++lim<2000))
+	while (!done)
 	{
+		++lim;
 			// ---------------------------
 		// *** ATUALIZAR POSICOES DAS PARTICULAS ***
 		// ---------------------------
-		update_particles(dev_psirt);																	// !!!!!!!!!!!!!!!!!!!!! paralelizar
+		int i=0,j=0;
+		Vector2D resultant_force;
+		for (i = 0; i < dev_psirt->n_particles; i++) 
+		{
+			if (p[i].status != DEAD) 
+			{		
+				set(&resultant_force,0.0,0.0);
+				// calcular força resultante primeiro
+				Vector2D resultant_vector;
+				set(&resultant_vector,0.0,0.0);
+				for (j = 0; j < ttl_trajs; j++) {
+					resultant(&(t[j]),&p[i], &resultant_vector);
+					sum_void(&resultant_force, &resultant_vector, &resultant_force);
+				}
+				set(&resultant_force, -resultant_force.x, -resultant_force.y);
+				update_particle(&p[i], &resultant_force);
+			}
+		}																// !!!!!!!!!!!!!!!!!!!!! paralelizar
 
 		// ---------------------------
 		// *** CALCULO DE TRAJETORIAS SATISFEITAS ***
 		// ---------------------------
-		int i=0,j=0;
 		for (i=0;i<dev_psirt->n_particles;i++) dev_psirt->particles[i].current_trajectories = 0; 	// zera #traj de cada particula
 		for (i=0;i<ttl_trajs; i++) 
 		{
@@ -188,6 +207,13 @@ void cuda_psirt(PSIRT* host_psirt)
 	PSIRT* dev_psirt;
 	GPUerrchk(cudaMalloc((void**)&dev_psirt, sizeof(PSIRT)));
 
+
+	// (parametros de paralelização)
+	int n_elements = host_psirt->n_particles;
+	int n_threads_per_block = 32;
+	int n_blocks = n_elements/n_threads_per_block;
+
+	//run_cuda_psirt<<<n_blocks,n_threads_per_block>>>(traj, part, dev_params, dev_psirt);
 	run_cuda_psirt<<<1,1>>>(traj, part, dev_params, dev_psirt);
 
 	// 4. COPIAR DE VOLTA
