@@ -17,9 +17,6 @@ void cuda_psirt(PSIRT* host_psirt);
 
 __global__ void run_cuda_psirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_psirt)
 {
-	//printf("\r\n===========\r\nSTARTUP CUDA PSIRT\r\n===========\r\nPARAMS:");
-	//printf("\t(#PROJ)\t(#TRAJ)\t(NPART)\r\n\t%d\t%d\t%d",dev_params[0], dev_params[1], dev_params[2]);
-
 	dev_psirt->particles = p;
 	dev_psirt->trajectories = t;
 	
@@ -34,19 +31,16 @@ __global__ void run_cuda_psirt(Trajectory* t, Particle* p, int* dev_params, PSIR
 	dev_psirt->optim_curr_iteration = 0;
 	dev_psirt->optim_max_iterations = 100;
 
+	int npart = dev_psirt->n_particles;
 	int ttl_trajs = dev_psirt->n_trajectories * dev_psirt->n_projections;
 
 	int is_optimizing_dirty_particle = 0;
 
-
 	printf("\r\n===========\r\nSTARTUP CUDA PSIRT\r\n===========\r\nPARAMS:");
 	printf("\t(#PROJ)\t(#TRAJ)\t(NPART)\r\n\t%d\t%d\t%d\r\n\r\n",dev_psirt->n_projections, dev_psirt->n_trajectories, dev_psirt->n_particles);
 
-
-
 	int done = 0;
 	int lim = 0;
-
 
 	while (!done&(++lim<1000))
 	{
@@ -60,15 +54,35 @@ __global__ void run_cuda_psirt(Trajectory* t, Particle* p, int* dev_params, PSIR
 		// ---------------------------
 		int i=0,j=0;
 		for (i=0;i<dev_psirt->n_particles;i++) dev_psirt->particles[i].current_trajectories = 0; 	// zera #traj de cada particula
-		for (i=0;i<ttl_trajs; i++) 											// calcula #traj de cada particula
-			update_trajectory(dev_psirt->trajectories[i], dev_psirt->particles, dev_psirt->n_particles);
-
+		for (i=0;i<ttl_trajs; i++) 
+		{
+			t[i].n_particulas_atual = 0;
+			for (j=0; j<npart; j++)
+			{
+				
+				if (p[j].status == ALIVE)
+				{
+					float distance_point_line = distance(&p[j].location,&t[i]);
+					if (distance_point_line<TRAJ_PART_THRESHOLD)
+					{
+						t[i].n_particulas_atual++;
+						p[j].current_trajectories++;
+					}
+				}
+				
+			}
+		}
 		// ---------------------------
 		// *** OTIMIZACAO E CONVERGENCIA ***
 		// ---------------------------
-		optimization_check(dev_psirt);													// otimizacao (continuar)
+		optimization_check(dev_psirt);					// otimizacao (continuar)
 
-		if (has_converged(dev_psirt->trajectories,dev_psirt->n_projections*dev_psirt->n_trajectories))							// convergiu
+		int stable = 0;
+		for (i=0;i<ttl_trajs;i++) 
+		{
+			if (t[i].n_particulas_atual>=t[i].n_particulas_estavel)	stable ++;
+		}
+		if (stable==ttl_trajs) // is stable
 		{
 			if (dev_psirt->optim_curr_part < dev_psirt->n_particles) optimize(dev_psirt);						// otimizacao (comecar)
 			else done = 1;	// DONE 

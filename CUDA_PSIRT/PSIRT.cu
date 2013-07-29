@@ -26,7 +26,7 @@ void read_sinogram(PSIRT* psirt);
 
 
 // DEVICE FUNCTIONS
-__device__ int update_particles(PSIRT* psirt);
+__device__ void update_particles(PSIRT* psirt);
 __device__ void optimize(PSIRT* psirt);
 __device__ int run_psirt(PSIRT* psirt);
 __device__ void optimization_check(PSIRT* psirt);
@@ -149,9 +149,9 @@ __device__ void optimize(PSIRT* psirt)
 			{
 				if (psirt->particles[j].current_trajectories
 						> psirt->particles[i].current_trajectories) {
-				//	temp = psirt->particles[j];
-				//	psirt->particles[j] = psirt->particles[i];
-				//	psirt->particles[i] = temp;
+					temp = psirt->particles[j];
+					psirt->particles[j] = psirt->particles[i];
+					psirt->particles[i] = temp;
 
 					//memcpy(&temp, &psirt->particles[j], sizeof(Particle));
 					//memcpy(&psirt->particles[j], &psirt->particles[i], sizeof(Particle));
@@ -215,13 +215,14 @@ __device__ void optimization_check(PSIRT* psirt)
 	}
 }
 
-__device__ int update_particles(PSIRT* psirt)
+__device__ void update_particles(PSIRT* psirt)
 {
-	int i=0,j=0,k=0;
+	int i=0,j=0;
 	Vector2D resultant_force;
-	for (i = 0; i < psirt->n_particles; i++) {
-		if (psirt->particles[i].status != DEAD) {
-				
+	for (i = 0; i < psirt->n_particles; i++) 
+	{
+		if (psirt->particles[i].status != DEAD) 
+		{		
 			set(&resultant_force,0.0,0.0);
 			// calcular força resultante primeiro
 			Vector2D resultant_vector;
@@ -230,15 +231,10 @@ __device__ int update_particles(PSIRT* psirt)
 				resultant(&(psirt->trajectories[j]),&psirt->particles[i], &resultant_vector);
 				sum_void(&resultant_force, &resultant_vector, &resultant_force);
 			}
-#ifdef DEBUG_PRINT
-			printf("\r\nPART [%d] \t pos (%f, %f)", i, psirt->particles[i].location.x, psirt->particles[i].location.y );
-#endif
 			set(&resultant_force, -resultant_force.x, -resultant_force.y);
-
 			update_particle(&psirt->particles[i], &resultant_force);
 		}
 	}
-	return i;
 }
 
 // ---------------------------

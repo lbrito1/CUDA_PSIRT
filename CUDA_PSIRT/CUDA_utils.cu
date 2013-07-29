@@ -1,4 +1,3 @@
-#include "PSIRT.cu"
 
 inline void GPUassert(cudaError_t code, char * file, int line, bool Abort=true)
 {

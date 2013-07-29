@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include "CUDA_utils.cu"
+#include "PSIRT.cu"
 #include "bmpfile.h"
 
 #ifndef RES_X
