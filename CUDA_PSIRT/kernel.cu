@@ -66,7 +66,7 @@ __global__ void run_cuda_psirt(Trajectory* t, Particle* p, int* dev_params, PSIR
 				update_particle(&p[i], &resultant_force);
 			}
 		}																// !!!!!!!!!!!!!!!!!!!!! paralelizar
-
+		__syncthreads();
 		// ---------------------------
 		// *** CALCULO DE TRAJETORIAS SATISFEITAS ***
 		// ---------------------------
@@ -88,6 +88,7 @@ __global__ void run_cuda_psirt(Trajectory* t, Particle* p, int* dev_params, PSIR
 				
 			}
 		}
+		__syncthreads();
 		// ---------------------------
 		// *** OTIMIZACAO E CONVERGENCIA ***
 		// ---------------------------
@@ -105,12 +106,17 @@ __global__ void run_cuda_psirt(Trajectory* t, Particle* p, int* dev_params, PSIR
 				is_optimizing_dirty_particle = 0;
 			}
 		}
-
+		__syncthreads();
 		int stable = 0;
 		for (i=0;i<ttl_trajs;i++) 
 		{
 			if (t[i].n_particulas_atual>=t[i].n_particulas_estavel)	stable ++;
 		}
+
+		if (lim>5000) {
+			
+		}
+
 		if (stable==ttl_trajs) // is stable					*************(trecho ok)
 		{
 			if (optim_curr_part < npart) 
@@ -144,6 +150,7 @@ __global__ void run_cuda_psirt(Trajectory* t, Particle* p, int* dev_params, PSIR
 				// CASO ESPECIAL
 				// partícula sem trajetoria, ELIMINAR SEM CHECAR
 				// ---------------------------
+				__syncthreads();
 				if (p[optim_curr_part].current_trajectories == 0)
 				{
 					is_optimizing_dirty_particle = 0;
@@ -213,8 +220,8 @@ void cuda_psirt(PSIRT* host_psirt)
 	int n_threads_per_block = 32;
 	int n_blocks = n_elements/n_threads_per_block;
 
-	//run_cuda_psirt<<<n_blocks,n_threads_per_block>>>(traj, part, dev_params, dev_psirt);
-	run_cuda_psirt<<<1,1>>>(traj, part, dev_params, dev_psirt);
+	run_cuda_psirt<<<n_blocks,n_threads_per_block>>>(traj, part, dev_params, dev_psirt);
+	//run_cuda_psirt<<<1,1>>>(traj, part, dev_params, dev_psirt);
 
 	// 4. COPIAR DE VOLTA
 	Particle *host_plist = host_psirt->particles;
