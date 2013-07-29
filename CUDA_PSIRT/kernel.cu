@@ -45,7 +45,7 @@ __global__ void run_cuda_psirt(Trajectory* t, Particle* p, int* dev_params, PSIR
 			// ---------------------------
 		// *** ATUALIZAR POSICOES DAS PARTICULAS ***
 		// ---------------------------
-		update_particles(dev_psirt);
+		update_particles(dev_psirt);																	// !!!!!!!!!!!!!!!!!!!!! paralelizar
 
 		// ---------------------------
 		// *** CALCULO DE TRAJETORIAS SATISFEITAS ***
@@ -55,7 +55,7 @@ __global__ void run_cuda_psirt(Trajectory* t, Particle* p, int* dev_params, PSIR
 		for (i=0;i<ttl_trajs; i++) 
 		{
 			t[i].n_particulas_atual = 0;
-			for (j=0; j<npart; j++)
+			for (j=0; j<npart; j++)																	// !!!!!!!!!!!!!!!!!!!!! paralelizar
 			{
 				if (p[j].status == ALIVE)
 				{

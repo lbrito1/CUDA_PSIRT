@@ -285,6 +285,13 @@ void read_sinogram(PSIRT* psirt)
 		}
 
 		fscanf (pFile, "%d", &psirt->n_particles);
+
+		// converter npart para multiplo de 32
+		if (psirt->n_particles % 32 != 0) 
+		{
+			psirt->n_particles = ((int) floor((double)(psirt->n_particles / 32)) + 1) * 32;
+		}
+
 		fclose (pFile);
 
 		int ttl_traj = (psirt->n_projections * psirt->n_trajectories);
