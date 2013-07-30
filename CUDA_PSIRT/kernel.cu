@@ -37,8 +37,10 @@ __global__ void run_cuda_psirt(Trajectory* t, Particle* p, int* dev_params, PSIR
 	int npart = dev_psirt->n_particles;
 	int ttl_trajs = dev_psirt->n_trajectories * dev_psirt->n_projections;
 
-	printf("\r\n===========\r\nSTARTUP CUDA PSIRT\r\n===========\r\nPARAMS:");
-	printf("\t(#PROJ)\t(#TRAJ)\t(NPART)\r\n\t%d\t%d\t%d\r\n\r\n",dev_psirt->n_projections, dev_psirt->n_trajectories, dev_psirt->n_particles);
+	if (part_index==0) {
+		printf("\r\n===========\r\nSTARTUP CUDA PSIRT (PARALLEL)\r\n===========\r\nPARAMS:");
+		printf("\t(#PROJ)\t(#TRAJ)\t(NPART)\r\n\t%d\t%d\t%d\r\n\r\n",dev_psirt->n_projections, dev_psirt->n_trajectories, dev_psirt->n_particles);
+	}
 
 	int done = 0;
 	int lim = 0;
@@ -217,7 +219,7 @@ __global__ void run_cuda_psirt_singlethread(Trajectory* t, Particle* p, int* dev
 	int npart = dev_psirt->n_particles;
 	int ttl_trajs = dev_psirt->n_trajectories * dev_psirt->n_projections;
 
-	printf("\r\n===========\r\nSTARTUP CUDA PSIRT\r\n===========\r\nPARAMS:");
+	printf("\r\n===========\r\CUDA PSIRT (1x1)\r\n===========\r\nPARAMS:");
 	printf("\t(#PROJ)\t(#TRAJ)\t(NPART)\r\n\t%d\t%d\t%d\r\n\r\n",dev_psirt->n_projections, dev_psirt->n_trajectories, dev_psirt->n_particles);
 
 	int done = 0;
@@ -418,34 +420,36 @@ void cuda_psirt(PSIRT* host_psirt)
 	cudaEventCreate(&stop_1);
 	cudaEventCreate(&stop_paralel);
 	
-	cudaEventRecord(start);
+	cudaEventRecord(start,0);
 	run_cuda_psirt_singlethread<<<1,1>>>(traj, part, dev_params, dev_psirt);
-	cudaEventRecord(stop_1);
-	
+	cudaDeviceSynchronize();
+	cudaEventRecord(stop_1,0);
+	cudaEventSynchronize(stop_1);
+
 	
 
 	// zerar
-	cudaDeviceSynchronize();
 	GPUerrchk(cudaMemcpy(traj, host_psirt->trajectories, sizeof(Trajectory) * n_ttl_traj, cudaMemcpyHostToDevice));
 	GPUerrchk(cudaMemcpy(part, host_psirt->particles, sizeof(Particle) * n_part, cudaMemcpyHostToDevice));
-
-	cudaEventRecord(start_paralel);
+	
+	cudaEventRecord(start_paralel,0);
 	run_cuda_psirt<<<n_blocks,n_threads_per_block>>>(traj, part, dev_params, dev_psirt);
+	cudaDeviceSynchronize();
+	cudaEventRecord(stop_paralel,0);
 	cudaEventSynchronize(stop_paralel);
 
-	cudaDeviceSynchronize();
 
 
 	float ms_1 = 0, ms_par = 0;
 	cudaEventElapsedTime(&ms_1, start, stop_1);
-	cudaEventElapsedTime(&ms_1, start_paralel, stop_paralel);
+	cudaEventElapsedTime(&ms_par, start_paralel, stop_paralel);
 	cudaEventDestroy(start);
 	cudaEventDestroy(start_paralel);
 	cudaEventDestroy(stop_1);
 	cudaEventDestroy(stop_paralel);
 
-	printf ("\r\nFINALIZOU EXEC CUDA (1x1)\r\n TEMPO DE EXECUÇÃO FINAL: %f ms\r\n==============\r\n", ms_1);
-	printf ("\r\nFINALIZOU EXEC CUDA (%dx%d)\r\n TEMPO DE EXECUÇÃO FINAL: %f ms\r\n==============\r\n", n_blocks, n_threads_per_block, ms_par);
+	printf ("\r\nFINALIZOU EXEC CUDA (1x1)\r\n TEMPO DE EXECUCAO FINAL: %f ms\r\n==============\r\n", ms_1);
+	printf ("\r\nFINALIZOU EXEC CUDA (%dx%d)\r\n TEMPO DE EXECUCAO FINAL: %f ms\r\n==============\r\n", n_blocks, n_threads_per_block, ms_par);
 
 	// 4. COPIAR DE VOLTA
 	Particle *host_plist = host_psirt->particles;
