@@ -90,24 +90,7 @@ __global__ void run_cuda_psirt(Trajectory* t, Particle* p, int* dev_params, PSIR
 				
 			}
 		}
-		__syncthreads();
-		// ---------------------------
-		// *** OTIMIZACAO E CONVERGENCIA ***
-		// ---------------------------
-		// pre-update otimizacao
-		if (is_optimizing_dirty_particle) {
-			// OTIMIZANDO
-			if (optim_curr_iteration < optim_max_iterations) {
-				optim_curr_iteration++;
-			}
-			// OTIMIZACAO FALHOU (EXCEDEU MAX ITERACOES)
-			else {
-				//			printf("\r\n[OPTIM]\tPARTICLE #%d LIVED (ITER #%d)",optim_curr_part,optim_curr_iteration);
-				p[optim_curr_part].status = ALIVE; // NAO CONSEGUIU REMOVER
-				optim_curr_part++;
-				is_optimizing_dirty_particle = 0;
-			}
-		}
+		
 		__syncthreads();
 		int stable = 0;
 		for (i=0;i<ttl_trajs;i++) 
@@ -115,10 +98,7 @@ __global__ void run_cuda_psirt(Trajectory* t, Particle* p, int* dev_params, PSIR
 			if (t[i].n_particulas_atual>=t[i].n_particulas_estavel)	stable ++;
 		}
 
-		if (lim>5000) {
-			
-		}
-
+		
 		if (stable==ttl_trajs) // is stable					*************(trecho ok)
 		{
 			// no optim
@@ -469,6 +449,7 @@ void cuda_psirt(PSIRT* host_psirt)
 
 	printf ("\r\nFINALIZOU EXEC CUDA (1x1)\r\n TEMPO DE EXECUCAO FINAL: %f ms\r\n==============\r\n", ms_1);
 	printf ("\r\nFINALIZOU EXEC CUDA (%dx%d)\r\n TEMPO DE EXECUCAO FINAL: %f ms\r\n==============\r\n", n_blocks, n_threads_per_block, ms_par);
+	printf("\r\nSpeedup intra-CUDA: %f\%\r\n",( (ms_1/ms_par)*100));
 	printf ("\r\nFINALIZOU EXEC CPU\r\n TEMPO DE EXECUCAO FINAL: %f ms\r\n==============\r\n", ms_cpu);
 
 	// 4. COPIAR DE VOLTA
