@@ -11,12 +11,14 @@
 //gambiarra
 //#define DEBUG_PRINT
 
-__global__ void run_cuda_psirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_psirt);
+__global__ void run_cuda_psirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_psirt, int* iter);
 
 void cuda_psirt(PSIRT* host_psirt);
 
-__global__ void run_cuda_psirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_psirt)
+__global__ void run_cuda_psirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_psirt, int* iter)
 {
+	*iter = 0;
+
 	// Indice da partícula a ser tratada nesta thread
 	int part_index = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -47,7 +49,7 @@ __global__ void run_cuda_psirt(Trajectory* t, Particle* p, int* dev_params, PSIR
 
 	while (!done)
 	{
-		++lim;
+		if (part_index==0) lim++;
 			// ---------------------------
 		// *** ATUALIZAR POSICOES DAS PARTICULAS ***
 		// ---------------------------
@@ -93,84 +95,18 @@ __global__ void run_cuda_psirt(Trajectory* t, Particle* p, int* dev_params, PSIR
 		
 		__syncthreads();
 		int stable = 0;
-		for (i=0;i<ttl_trajs;i++) 
-		{
-			if (t[i].n_particulas_atual>=t[i].n_particulas_estavel)	stable ++;
-		}
+		for (i=0;i<ttl_trajs;i++)  if (t[i].n_particulas_atual>=t[i].n_particulas_estavel)	stable ++;
+		
 
 		
 		if (stable==ttl_trajs) // is stable					*************(trecho ok)
 		{
-			// no optim
 			done = 1;
 
-
-			//if (optim_curr_part < npart) 
-			//{
-				// optimize
-				// ---------------------------
-				// *** PRIMEIRO PASSO ***
-				// Deve-se ordenar as particulas de acordo
-				// com a quantidade de trajetorias a que
-				// cada uma atende (0 a 3), ordem crescente.
-				// ---------------------------
-				/*if (!optim_is_ranked)
-				{
-					Particle temp;
-					for (i = 0; i < npart; i++)
-					{
-						for (j = npart-1; j > i; j--)
-						{
-							if ((p[j].current_trajectories < p[i].current_trajectories) & (i!=j))  
-							{
-								temp = p[i];
-								p[i] = p[j];
-								p[j] = temp;
-							}
-						}
-					}
-					optim_is_ranked = 1;
-				}*/
-
-				// ---------------------------
-				// CASO ESPECIAL
-				// partícula sem trajetoria, ELIMINAR SEM CHECAR
-				// ---------------------------
-				//__syncthreads();
-			/*	if (p[part_index].current_trajectories == 0)
-				{
-					is_optimizing_dirty_particle = 0;
-					p[part_index].status = DEAD;
-					optim_curr_part++;
-				}
-
-				// ---------------------------
-				// CASO NORMAL
-				// partícula atende a mais de 0 trajetórias, CHECAR ANTES
-				// ---------------------------
-				else
-				{
-					is_optimizing_dirty_particle = 1;
-
-					// COMECAR A CHECAR PARTICULA
-					if (p[optim_curr_part].status == ALIVE)
-					{
-						optim_curr_iteration = 0;
-						p[optim_curr_part].status = CHECKING;
-					}
-					// PARTICULA CHECADA & CONVERGIU -> REMOVER
-					else if (p[optim_curr_part].status == CHECKING)
-					{
-						p[optim_curr_part].status = DEAD;
-						optim_curr_part++;
-					}
-				}*/
-			//}
-			// (end optim)
-
-			//else done = 1;	// DONE 
 		}
 	}
+
+	*iter = lim;
 }
 
 
@@ -180,8 +116,10 @@ __global__ void run_cuda_psirt(Trajectory* t, Particle* p, int* dev_params, PSIR
 
 
 
-__global__ void run_cuda_psirt_singlethread(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_psirt)
+__global__ void run_cuda_psirt_singlethread(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_psirt, int* iter)
 {
+	*iter = 0;
+
 	dev_psirt->particles = p;
 	dev_psirt->trajectories = t;
 	
@@ -270,87 +208,17 @@ __global__ void run_cuda_psirt_singlethread(Trajectory* t, Particle* p, int* dev
 		}
 		__syncthreads();
 		int stable = 0;
-		for (i=0;i<ttl_trajs;i++) 
-		{
-			if (t[i].n_particulas_atual>=t[i].n_particulas_estavel)	stable ++;
-		}
+		for (i=0;i<ttl_trajs;i++) if (t[i].n_particulas_atual>=t[i].n_particulas_estavel)	stable ++;
+		
 
-		if (lim>5000) {
-			
-		}
 
 		if (stable==ttl_trajs) // is stable					*************(trecho ok)
 		{
-			// no optim
 			done = 1;
-
-
-			//if (optim_curr_part < npart) 
-			//{
-				// optimize
-				// ---------------------------
-				// *** PRIMEIRO PASSO ***
-				// Deve-se ordenar as particulas de acordo
-				// com a quantidade de trajetorias a que
-				// cada uma atende (0 a 3), ordem crescente.
-				// ---------------------------
-				/*if (!optim_is_ranked)
-				{
-					Particle temp;
-					for (i = 0; i < npart; i++)
-					{
-						for (j = npart-1; j > i; j--)
-						{
-							if ((p[j].current_trajectories < p[i].current_trajectories) & (i!=j))  
-							{
-								temp = p[i];
-								p[i] = p[j];
-								p[j] = temp;
-							}
-						}
-					}
-					optim_is_ranked = 1;
-				}*/
-
-				// ---------------------------
-				// CASO ESPECIAL
-				// partícula sem trajetoria, ELIMINAR SEM CHECAR
-				// ---------------------------
-				//__syncthreads();
-			/*	if (p[part_index].current_trajectories == 0)
-				{
-					is_optimizing_dirty_particle = 0;
-					p[part_index].status = DEAD;
-					optim_curr_part++;
-				}
-
-				// ---------------------------
-				// CASO NORMAL
-				// partícula atende a mais de 0 trajetórias, CHECAR ANTES
-				// ---------------------------
-				else
-				{
-					is_optimizing_dirty_particle = 1;
-
-					// COMECAR A CHECAR PARTICULA
-					if (p[optim_curr_part].status == ALIVE)
-					{
-						optim_curr_iteration = 0;
-						p[optim_curr_part].status = CHECKING;
-					}
-					// PARTICULA CHECADA & CONVERGIU -> REMOVER
-					else if (p[optim_curr_part].status == CHECKING)
-					{
-						p[optim_curr_part].status = DEAD;
-						optim_curr_part++;
-					}
-				}*/
-			//}
-			// (end optim)
-
-			//else done = 1;	// DONE 
 		}
 	}
+
+	*iter = lim;
 }
 
 
@@ -388,28 +256,32 @@ void cuda_psirt(PSIRT* host_psirt)
 	PSIRT* dev_psirt;
 	GPUerrchk(cudaMalloc((void**)&dev_psirt, sizeof(PSIRT)));
 
+	// PARAMETROS DE PROFILING
+	int *dev_iter;
+	GPUerrchk(cudaMalloc((void**)&dev_iter, sizeof(int)));
+
 
 	// (parametros de paralelização)
 	int n_elements = host_psirt->n_particles;
 	int n_threads_per_block = 32;
 	int n_blocks = n_elements/n_threads_per_block;
 
-	cudaEvent_t start, start_paralel, stop_1, stop_paralel, start_cpu, stop_cpu;
-	cudaEventCreate(&start);
+	cudaEvent_t start_1, start_paralel, stop_1, stop_paralel, start_cpu, stop_cpu;
+	cudaEventCreate(&start_1);
 	cudaEventCreate(&start_paralel);
 	cudaEventCreate(&stop_1);
 	cudaEventCreate(&stop_paralel);
-	cudaEventCreate(&start_cpu);
-	cudaEventCreate(&stop_cpu);
 
 
 
 	// CUDA 1x1 run
-	cudaEventRecord(start,0);
-	run_cuda_psirt_singlethread<<<1,1>>>(traj, part, dev_params, dev_psirt);
+	cudaEventRecord(start_1,0);
+	int iter_1x1 = 0;
+	run_cuda_psirt_singlethread<<<1,1>>>(traj, part, dev_params, dev_psirt, dev_iter);
 	cudaDeviceSynchronize();
 	cudaEventRecord(stop_1,0);
 	cudaEventSynchronize(stop_1);
+	GPUerrchk(cudaMemcpy(&iter_1x1, dev_iter, sizeof(int), cudaMemcpyDeviceToHost));
 
 
 	
@@ -421,36 +293,36 @@ void cuda_psirt(PSIRT* host_psirt)
 
 	// CUDA parallel run
 	cudaEventRecord(start_paralel,0);
-	run_cuda_psirt<<<n_blocks,n_threads_per_block>>>(traj, part, dev_params, dev_psirt);
+	int iter_par = 0;
+	run_cuda_psirt<<<n_blocks,n_threads_per_block>>>(traj, part, dev_params, dev_psirt, dev_iter);
 	cudaDeviceSynchronize();
 	cudaEventRecord(stop_paralel,0);
 	cudaEventSynchronize(stop_paralel);
-
+	GPUerrchk(cudaMemcpy(&iter_par, dev_iter, sizeof(int), cudaMemcpyDeviceToHost));
 
 	
 	// CPU pure run
-	cudaEventRecord(start_cpu,0);
-	while(!run_psirt_cpu_no_optim(host_psirt));		//!!!!!!!!
-	cudaEventRecord(stop_cpu,0);
-	cudaEventSynchronize(stop_cpu);
+	clock_t start, end;
+    float ms_cpu;
+	int iter_cpu = 0;
+	start = clock();
+	while(!run_psirt_cpu_no_optim(host_psirt,iter_cpu++));		
+	end = clock();
+	ms_cpu = (float) (((double) (end - start)) / CLOCKS_PER_SEC);
 
 
-
-	float ms_1 = 0, ms_par = 0, ms_cpu = 0;
-	cudaEventElapsedTime(&ms_1, start, stop_1);
+	float ms_1 = 0, ms_par = 0;
+	cudaEventElapsedTime(&ms_1, start_1, stop_1);
 	cudaEventElapsedTime(&ms_par, start_paralel, stop_paralel);
-	cudaEventElapsedTime(&ms_cpu, start_cpu, stop_cpu);
-	cudaEventDestroy(start);
+	cudaEventDestroy(start_1);
 	cudaEventDestroy(start_paralel);
 	cudaEventDestroy(stop_1);
 	cudaEventDestroy(stop_paralel);
-	cudaEventDestroy(start_cpu);
-	cudaEventDestroy(stop_cpu);
 
-	printf ("\r\nFINALIZOU EXEC CUDA (1x1)\r\n TEMPO DE EXECUCAO FINAL: %f ms\r\n==============\r\n", ms_1);
-	printf ("\r\nFINALIZOU EXEC CUDA (%dx%d)\r\n TEMPO DE EXECUCAO FINAL: %f ms\r\n==============\r\n", n_blocks, n_threads_per_block, ms_par);
+	printf ("\r\nFINALIZOU EXEC CUDA (1x1)\r\n TEMPO DE EXECUCAO FINAL: %fms \t EM %d iters\r\n==============\r\n", ms_1, iter_1x1);
+	printf ("\r\nFINALIZOU EXEC CUDA (%dx%d)\r\n TEMPO DE EXECUCAO FINAL: %fms \t EM %d iters\r\n==============\r\n", n_blocks, n_threads_per_block, ms_par, iter_par);
 	printf("\r\nSpeedup intra-CUDA: %f\%\r\n",( (ms_1/ms_par)*100));
-	printf ("\r\nFINALIZOU EXEC CPU\r\n TEMPO DE EXECUCAO FINAL: %f ms\r\n==============\r\n", ms_cpu);
+	printf ("\r\nFINALIZOU EXEC CPU\r\n TEMPO DE EXECUCAO FINAL: %fms \t EM %d iters\r\n==============\r\n", ms_cpu*1000, iter_cpu);
 
 	// 4. COPIAR DE VOLTA
 	Particle *host_plist = host_psirt->particles;

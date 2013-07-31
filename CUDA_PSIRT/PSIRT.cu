@@ -23,7 +23,7 @@ typedef struct {
 __host__ PSIRT* init_psirt();
 void init_particles(PSIRT* psirt);
 void read_sinogram(PSIRT* psirt);
-__host__ int run_psirt_cpu_no_optim(PSIRT* psirt);
+__host__ int run_psirt_cpu_no_optim(PSIRT* psirt, int iter);
 
 // DEVICE FUNCTIONS
 __host__ __device__ void update_particles(PSIRT* psirt);
@@ -132,7 +132,7 @@ __device__ int run_psirt(PSIRT* psirt)
 
 
 
-__host__ int run_psirt_cpu_no_optim(PSIRT* psirt)
+__host__ int run_psirt_cpu_no_optim(PSIRT* psirt, int iter)
 {
 	// ---------------------------
 	// *** ATUALIZAR POSICOES DAS PARTICULAS ***
