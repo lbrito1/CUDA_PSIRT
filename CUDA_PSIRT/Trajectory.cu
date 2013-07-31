@@ -53,15 +53,15 @@ Trajectory* new_trajectory(Vector2D s, Vector2D d, int part_est);
 
 
 // DEVICE FUNCTIONS
-__device__ int trajectory_stable(Trajectory *t);
-__device__ Vector2D* trajectory_intersection(Trajectory *t1, Trajectory *t2);
-__device__ float distance(Vector2D* p, Trajectory* t);
-__device__ Vector2D* projection(Vector2D* p, Trajectory* t);
-__device__ int current_status(Trajectory* t);
-__device__ float trajectory_force(Trajectory* t);
-__device__ inline void resultant(Trajectory *t, Particle* p, Vector2D *resultant);
-__device__ void update_trajectory(Trajectory t, Particle *p, int nparticle);
-__device__ inline void directionFrom(Vector2D *point, Trajectory *t, Vector2D *direction);
+__host__ __device__ int trajectory_stable(Trajectory *t);
+__host__ __device__ Vector2D* trajectory_intersection(Trajectory *t1, Trajectory *t2);
+__host__ __device__ float distance(Vector2D* p, Trajectory* t);
+__host__ __device__ Vector2D* projection(Vector2D* p, Trajectory* t);
+__host__ __device__ int current_status(Trajectory* t);
+__host__ __device__ float trajectory_force(Trajectory* t);
+__host__ __device__ inline void resultant(Trajectory *t, Particle* p, Vector2D *resultant);
+__host__ __device__ void update_trajectory(Trajectory *t, Particle *p, int nparticle);
+__host__ __device__ inline void directionFrom(Vector2D *point, Trajectory *t, Vector2D *direction);
 
 
 
@@ -76,7 +76,7 @@ Trajectory* new_trajectory(Vector2D s, Vector2D d, int part_est) {
 	return t;
 }
 
-__device__ float distance(Vector2D* p, Trajectory* t) {
+__host__ __device__ float distance(Vector2D* p, Trajectory* t) {
 	Vector2D u,v,dist;
 	v = t->direction;
 	minus_void(p,&(t->source), &u);
@@ -95,21 +95,21 @@ __device__ float distance(Vector2D* p, Trajectory* t) {
 	return mag;
 }
 
-__device__ float trajectory_force(Trajectory *t)
+__host__ __device__ float trajectory_force(Trajectory *t)
 {
 	int delta = t->n_particulas_estavel - t->n_particulas_atual;
 	//	printf("\r\nATUAL = %d \t ESTAVEL = %d", t->n_particulas_atual, t->n_particulas_estavel);
 	return (TRAJ_FORCE_LINEAR*delta>0)?TRAJ_FORCE_LINEAR*delta:0;
 }
 
-__device__ int current_status(Trajectory* t)
+__host__ __device__ int current_status(Trajectory* t)
 {
 	return (t->n_particulas_estavel-t->n_particulas_atual>0)?t->n_particulas_estavel-t->n_particulas_atual:0;
 }
 
 
 
-__device__ inline void directionFrom(Vector2D *point, Trajectory *t, Vector2D *direction)
+__host__ __device__ inline void directionFrom(Vector2D *point, Trajectory *t, Vector2D *direction)
 {
 	Vector2D begin, end;// = clone(t->source);
 	set(&begin, t->source.x,t->source.y);
@@ -133,9 +133,9 @@ __device__ inline void directionFrom(Vector2D *point, Trajectory *t, Vector2D *d
 	//	return new_vector(u->x - projuv->x, u->y - projuv->y);
 }
 
-__device__ void update_trajectory(Trajectory t, Particle *p, int nparticle)
+__host__ __device__ void update_trajectory(Trajectory *t, Particle *p, int nparticle)
 {
-	t.n_particulas_atual = 0;
+	t->n_particulas_atual = 0;
 
 	int i=0;
 	for (i=0; i<nparticle; i++)
@@ -143,18 +143,18 @@ __device__ void update_trajectory(Trajectory t, Particle *p, int nparticle)
 		if (p[i].status == ALIVE)
 		{
 			// Find distance from point to line segment (orthogonal)
-			float distance_point_line = distance(&p[i].location,&t);
+			float distance_point_line = distance(&p[i].location,t);
 
 			if (distance_point_line<TRAJ_PART_THRESHOLD)
 			{
-				t.n_particulas_atual++;
+				t->n_particulas_atual+=1;
 				p[i].current_trajectories++;
 			}
 		}
 	}
 }
 
-__device__ int trajectory_stable(Trajectory *t)
+__host__ __device__ int trajectory_stable(Trajectory *t)
 {
 	if (t->n_particulas_atual>=t->n_particulas_estavel) return TRUE;
 	else
@@ -165,7 +165,7 @@ __device__ int trajectory_stable(Trajectory *t)
 }
 
 // Gravitacao universal
-__device__ inline void resultant(Trajectory *t, Particle* p, Vector2D *resultant)
+__host__ __device__ inline void resultant(Trajectory *t, Particle* p, Vector2D *resultant)
 {
 	directionFrom(&p->location, t, resultant);
 	float distance_point_line = distance(&p->location,t);

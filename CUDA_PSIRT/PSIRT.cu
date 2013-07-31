@@ -23,10 +23,10 @@ typedef struct {
 __host__ PSIRT* init_psirt();
 void init_particles(PSIRT* psirt);
 void read_sinogram(PSIRT* psirt);
-
+__host__ int run_psirt_cpu_no_optim(PSIRT* psirt);
 
 // DEVICE FUNCTIONS
-__device__ void update_particles(PSIRT* psirt);
+__host__ __device__ void update_particles(PSIRT* psirt);
 __device__ void optimize(PSIRT* psirt);
 __device__ int run_psirt(PSIRT* psirt);
 __device__ void optimization_check(PSIRT* psirt);
@@ -116,7 +116,7 @@ __device__ int run_psirt(PSIRT* psirt)
 	for (i=0;i<psirt->n_particles;i++) psirt->particles[i].current_trajectories = 0; 	// zera #traj de cada particula
 	for (i=0;i<psirt->n_projections;i++) 											// calcula #traj de cada particula
 		for (j=0;j<psirt->n_trajectories;j++)
-			update_trajectory(psirt->trajectories[(i*psirt->n_projections)+j], psirt->particles, psirt->n_particles);
+			update_trajectory(&psirt->trajectories[(i*psirt->n_projections)+j], psirt->particles, psirt->n_particles);
 
 	// ---------------------------
 	// *** OTIMIZACAO E CONVERGENCIA ***
@@ -128,6 +128,30 @@ __device__ int run_psirt(PSIRT* psirt)
 		else return 0;	// DONE
 	}
 	return 1;	// NOT DONE
+}
+
+
+
+__host__ int run_psirt_cpu_no_optim(PSIRT* psirt)
+{
+	// ---------------------------
+	// *** ATUALIZAR POSICOES DAS PARTICULAS ***
+	// ---------------------------
+	update_particles(psirt);
+
+
+	// ---------------------------
+	// *** CALCULO DE TRAJETORIAS SATISFEITAS ***
+	// ---------------------------
+	int i=0,ttl_traj = psirt->n_projections*psirt->n_trajectories;
+	for (i=0;i<psirt->n_particles;i++) psirt->particles[i].current_trajectories = 0; 	// zera #traj de cada particula
+	for (i=0;i<ttl_traj;i++) update_trajectory(&psirt->trajectories[i], psirt->particles, psirt->n_particles);
+
+	if (has_converged(psirt->trajectories,ttl_traj)) 
+		{
+			return 1;	// DONE
+	}
+	else return 0;	// NOT DONE
 }
 
 __device__ void optimize(PSIRT* psirt)
@@ -215,7 +239,7 @@ __device__ void optimization_check(PSIRT* psirt)
 	}
 }
 
-__device__ void update_particles(PSIRT* psirt)
+__host__ __device__ void update_particles(PSIRT* psirt)
 {
 	int i=0,j=0;
 	Vector2D resultant_force;

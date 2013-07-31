@@ -414,17 +414,23 @@ void cuda_psirt(PSIRT* host_psirt)
 	int n_threads_per_block = 32;
 	int n_blocks = n_elements/n_threads_per_block;
 
-	cudaEvent_t start, start_paralel, stop_1, stop_paralel;
+	cudaEvent_t start, start_paralel, stop_1, stop_paralel, start_cpu, stop_cpu;
 	cudaEventCreate(&start);
 	cudaEventCreate(&start_paralel);
 	cudaEventCreate(&stop_1);
 	cudaEventCreate(&stop_paralel);
-	
+	cudaEventCreate(&start_cpu);
+	cudaEventCreate(&stop_cpu);
+
+
+
+	// CUDA 1x1 run
 	cudaEventRecord(start,0);
 	run_cuda_psirt_singlethread<<<1,1>>>(traj, part, dev_params, dev_psirt);
 	cudaDeviceSynchronize();
 	cudaEventRecord(stop_1,0);
 	cudaEventSynchronize(stop_1);
+
 
 	
 
@@ -432,6 +438,8 @@ void cuda_psirt(PSIRT* host_psirt)
 	GPUerrchk(cudaMemcpy(traj, host_psirt->trajectories, sizeof(Trajectory) * n_ttl_traj, cudaMemcpyHostToDevice));
 	GPUerrchk(cudaMemcpy(part, host_psirt->particles, sizeof(Particle) * n_part, cudaMemcpyHostToDevice));
 	
+
+	// CUDA parallel run
 	cudaEventRecord(start_paralel,0);
 	run_cuda_psirt<<<n_blocks,n_threads_per_block>>>(traj, part, dev_params, dev_psirt);
 	cudaDeviceSynchronize();
@@ -439,17 +447,29 @@ void cuda_psirt(PSIRT* host_psirt)
 	cudaEventSynchronize(stop_paralel);
 
 
+	
+	// CPU pure run
+	cudaEventRecord(start_cpu,0);
+	while(!run_psirt_cpu_no_optim(host_psirt));		//!!!!!!!!
+	cudaEventRecord(stop_cpu,0);
+	cudaEventSynchronize(stop_cpu);
 
-	float ms_1 = 0, ms_par = 0;
+
+
+	float ms_1 = 0, ms_par = 0, ms_cpu = 0;
 	cudaEventElapsedTime(&ms_1, start, stop_1);
 	cudaEventElapsedTime(&ms_par, start_paralel, stop_paralel);
+	cudaEventElapsedTime(&ms_cpu, start_cpu, stop_cpu);
 	cudaEventDestroy(start);
 	cudaEventDestroy(start_paralel);
 	cudaEventDestroy(stop_1);
 	cudaEventDestroy(stop_paralel);
+	cudaEventDestroy(start_cpu);
+	cudaEventDestroy(stop_cpu);
 
 	printf ("\r\nFINALIZOU EXEC CUDA (1x1)\r\n TEMPO DE EXECUCAO FINAL: %f ms\r\n==============\r\n", ms_1);
 	printf ("\r\nFINALIZOU EXEC CUDA (%dx%d)\r\n TEMPO DE EXECUCAO FINAL: %f ms\r\n==============\r\n", n_blocks, n_threads_per_block, ms_par);
+	printf ("\r\nFINALIZOU EXEC CPU\r\n TEMPO DE EXECUCAO FINAL: %f ms\r\n==============\r\n", ms_cpu);
 
 	// 4. COPIAR DE VOLTA
 	Particle *host_plist = host_psirt->particles;

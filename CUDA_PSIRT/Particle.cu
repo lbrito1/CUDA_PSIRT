@@ -25,7 +25,7 @@ typedef struct {
 Particle* new_particle();
 
 // DEVICE FUNCTIONS
-__device__ void update_particle(Particle* particle, Vector2D* resultant_force);
+__host__ __device__ void update_particle(Particle* particle, Vector2D* resultant_force);
 
 double particle_mass = 0.01;
 
@@ -39,7 +39,7 @@ Particle* new_particle()
 	return part;
 }
 
-__device__ void update_particle(Particle* particle, Vector2D* resultant_force)
+__host__ __device__ void update_particle(Particle* particle, Vector2D* resultant_force)
 {
 	mult_constant_void(resultant_force, PARTICLE_MASS);
 	sum_void(&particle->location, resultant_force, &particle->location);

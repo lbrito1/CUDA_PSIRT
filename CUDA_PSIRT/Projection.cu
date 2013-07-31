@@ -12,12 +12,12 @@ typedef struct {
 void init_proj(Projection* p, double angle, int ntraj, int* partptraj);
 
 // DEVICE FUNCTIONS
-__device__ int projection_stable(Projection *p, int n_traj);
+__host__ __device__ int projection_stable(Projection *p, int n_traj);
 
-__device__ int has_converged(Trajectory *t, int n_ttl_traj);
+__host__ __device__ int has_converged(Trajectory *t, int n_ttl_traj);
 
 // IMPLEMENTATION
-__device__ int projection_stable(Projection *p, int n_traj)
+__host__ __device__ int projection_stable(Projection *p, int n_traj)
 {
 	int i=0, stable = 0;
 	for (; i<n_traj; i++ ) stable += trajectory_stable(&p->lista_trajetorias[i]);
@@ -25,7 +25,7 @@ __device__ int projection_stable(Projection *p, int n_traj)
 	else return FALSE;
 }
 
-__device__ int has_converged(Trajectory *t, int n_ttl_traj)
+__host__ __device__ int has_converged(Trajectory *t, int n_ttl_traj)
 {
 	int i=0, stable = 0;
 	for (;i<n_ttl_traj;i++) stable += trajectory_stable(&t[i]);
