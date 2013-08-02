@@ -18,6 +18,7 @@
 typedef struct {
 	Vector2D location;
 	int current_trajectories;
+	int traj_1, traj_2, traj_3;
 	int status;
 } Particle;
 

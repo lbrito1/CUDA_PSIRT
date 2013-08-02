@@ -39,13 +39,11 @@ __global__ void run_cuda_psirt(Trajectory* t, Particle* p, int* dev_params, PSIR
 	int npart = dev_psirt->n_particles;
 	int ttl_trajs = dev_psirt->n_trajectories * dev_psirt->n_projections;
 
-	if (part_index==0) {
-		printf("\r\n===========\r\nSTARTUP CUDA PSIRT (PARALLEL)\r\n===========\r\nPARAMS:");
-		printf("\t(#PROJ)\t(#TRAJ)\t(NPART)\r\n\t%d\t%d\t%d\r\n\r\n",dev_psirt->n_projections, dev_psirt->n_trajectories, dev_psirt->n_particles);
-	}
-
 	int done = 0;
 	int lim = 0;
+
+	double ttl_time_p1 = 0;
+	double ttl_time_p2 = 0;
 
 	while (!done)
 	{
@@ -70,7 +68,12 @@ __global__ void run_cuda_psirt(Trajectory* t, Particle* p, int* dev_params, PSIR
 			update_particle(&p[part_index], &resultant_force);
 		}
 		//}																// !!!!!!!!!!!!!!!!!!!!! paralelizar
+
+		
+
 		__syncthreads();
+	
+
 		// ---------------------------
 		// *** CALCULO DE TRAJETORIAS SATISFEITAS ***
 		// ---------------------------
@@ -104,6 +107,8 @@ __global__ void run_cuda_psirt(Trajectory* t, Particle* p, int* dev_params, PSIR
 			done = 1;
 
 		}
+
+		
 	}
 
 	*iter = lim;

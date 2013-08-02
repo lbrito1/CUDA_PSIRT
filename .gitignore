@@ -15,3 +15,7 @@
 *.exe
 *.out
 *.app
+
+# VS
+/Debug
+CUDA_PSIRT.opensdf
