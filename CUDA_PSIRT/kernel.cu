@@ -74,16 +74,11 @@ __global__ void run_cuda_psirt(Trajectory* t, Particle* p, int* dev_params, PSIR
 			t[i].n_particulas_atual = 0;
 			for (j=0; j<npart; j++)																	// !!!!!!!!!!!!!!!!!!!!! paralelizar
 			{
-				if (p[j].status == ALIVE)
+				if (distance(&p[j].location,&t[i])<TRAJ_PART_THRESHOLD)
 				{
-					float distance_point_line = distance(&p[j].location,&t[i]);
-					if (distance_point_line<TRAJ_PART_THRESHOLD)
-					{
-						t[i].n_particulas_atual++;
-						p[j].current_trajectories++;
-					}
-				}
-				
+					t[i].n_particulas_atual++;
+					p[j].current_trajectories++;
+				}				
 			}
 		}
 		
@@ -302,7 +297,7 @@ void cuda_psirt(PSIRT* host_psirt)
     float ms_cpu;
 	int iter_cpu = 0;
 	start = clock();
-	while(!run_psirt_cpu_no_optim(host_psirt,iter_cpu++));		
+	//while(!run_psirt_cpu_no_optim(host_psirt,iter_cpu++));		
 	end = clock();
 	ms_cpu = (float) (((double) (end - start)) / CLOCKS_PER_SEC);
 
