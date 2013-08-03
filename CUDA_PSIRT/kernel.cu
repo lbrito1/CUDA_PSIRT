@@ -85,7 +85,7 @@ __global__ void run_cuda_psirt(Trajectory* t, Particle* p, int* dev_params, PSIR
 		int stable = 0;
 		for (i=0;i<ttl_trajs;i++)  if (t[i].n_particulas_atual>=t[i].n_particulas_estavel)	stable ++;
 		
-
+		__syncthreads();
 		
 		if (stable==ttl_trajs) // is stable					*************(trecho ok)
 		{
@@ -279,7 +279,7 @@ void cuda_psirt(PSIRT* host_psirt)
 	// CUDA parallel run
 	cudaEventRecord(start_paralel,0);
 	int iter_par = 0;
-	run_cuda_psirt<<<1, 64>>>(traj, part, dev_params, dev_psirt, dev_iter);
+	run_cuda_psirt<<<1, n_elements>>>(traj, part, dev_params, dev_psirt, dev_iter);
 	cudaDeviceSynchronize();
 	cudaEventRecord(stop_paralel,0);
 	cudaEventSynchronize(stop_paralel);
@@ -291,7 +291,7 @@ void cuda_psirt(PSIRT* host_psirt)
     float ms_cpu;
 	int iter_cpu = 0;
 	start = clock();
-	//while(!run_psirt_cpu_no_optim(host_psirt,iter_cpu++));		
+	while(!run_psirt_cpu_no_optim(host_psirt,iter_cpu++));		
 	end = clock();
 	ms_cpu = (float) (((double) (end - start)) / CLOCKS_PER_SEC);
 

@@ -99,7 +99,7 @@ __host__ __device__ float trajectory_force(Trajectory *t)
 {
 	int delta = t->n_particulas_estavel - t->n_particulas_atual;
 	//	printf("\r\nATUAL = %d \t ESTAVEL = %d", t->n_particulas_atual, t->n_particulas_estavel);
-	return (TRAJ_FORCE_LINEAR*delta>0)? min(TRAJ_FORCE_LINEAR*delta, 9999) :0;
+	return (TRAJ_FORCE_LINEAR*delta>0)? min(TRAJ_FORCE_LINEAR*delta, 50) :0;
 }
 
 __host__ __device__ int current_status(Trajectory* t)
