@@ -68,18 +68,17 @@ __global__ void run_cuda_psirt(Trajectory* t, Particle* p, int* dev_params, PSIR
 		// *** CALCULO DE TRAJETORIAS SATISFEITAS ***
 		// ---------------------------
 		p[part_index].current_trajectories = 0; 	// zera #traj de cada particula
+		
+		for (i=0;i<ttl_trajs; i++)  t[i].n_particulas_atual = 0;
 		__syncthreads();
+
 		for (i=0;i<ttl_trajs; i++) 
 		{
-			t[i].n_particulas_atual = 0;
-			for (j=0; j<npart; j++)																	// !!!!!!!!!!!!!!!!!!!!! paralelizar
+			if (distance(&p[part_index].location,&t[i])<TRAJ_PART_THRESHOLD)
 			{
-				if (distance(&p[j].location,&t[i])<TRAJ_PART_THRESHOLD)
-				{
-					t[i].n_particulas_atual++;
-					p[j].current_trajectories++;
-				}				
-			}
+				atomicAdd(&t[i].n_particulas_atual, 1);
+				p[part_index].current_trajectories++;
+			}				
 		}
 		
 		__syncthreads();
@@ -167,16 +166,11 @@ __global__ void run_cuda_psirt_singlethread(Trajectory* t, Particle* p, int* dev
 			t[i].n_particulas_atual = 0;
 			for (j=0; j<npart; j++)																	// !!!!!!!!!!!!!!!!!!!!! paralelizar
 			{
-				if (p[j].status == ALIVE)
+				if (distance(&p[j].location,&t[i])<TRAJ_PART_THRESHOLD)
 				{
-					float distance_point_line = distance(&p[j].location,&t[i]);
-					if (distance_point_line<TRAJ_PART_THRESHOLD)
-					{
-						t[i].n_particulas_atual++;
-						p[j].current_trajectories++;
-					}
+					t[i].n_particulas_atual++;
+					p[j].current_trajectories++;
 				}
-				
 			}
 		}
 		__syncthreads();
@@ -285,7 +279,7 @@ void cuda_psirt(PSIRT* host_psirt)
 	// CUDA parallel run
 	cudaEventRecord(start_paralel,0);
 	int iter_par = 0;
-	run_cuda_psirt<<<n_blocks,n_threads_per_block>>>(traj, part, dev_params, dev_psirt, dev_iter);
+	run_cuda_psirt<<<1, 64>>>(traj, part, dev_params, dev_psirt, dev_iter);
 	cudaDeviceSynchronize();
 	cudaEventRecord(stop_paralel,0);
 	cudaEventSynchronize(stop_paralel);
