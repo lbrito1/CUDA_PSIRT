@@ -3,6 +3,10 @@
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 
+#define NPART 64
+#define NTRAJ 21
+
+// idéia: separar em NPART threads com PPSIRT-1 (atualizar particulas) + NTRAJ threads com PPSIRT-2 (atualizar trajetorias), asynch
 
 __global__ void ppsirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_psirt, int* iter)
 {
@@ -34,66 +38,73 @@ __global__ void ppsirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_p
 	double ttl_time_p1 = 0;
 	double ttl_time_p2 = 0;
 
+	__shared__ Particle sh_part[NPART];
+	__shared__ float sh_dist_p_t[NPART][NTRAJ];
+
+	sh_part[part_index] = p[part_index];
+	
+
 	while (!done)
 	{
-		atomicAdd(&lim, 1);
-			// ---------------------------
+		if (part_index==0) lim++;
+		
+		// ---------------------------
 		// *** ATUALIZAR POSICOES DAS PARTICULAS ***
 		// ---------------------------
 		int i=0,j=0;
-		Vector2D resultant_force, resultant_vector;
-		//for (i = 0; i < dev_psirt->n_particles; i++) 
-		//{
-		if (p[part_index].status != DEAD) 
-		{		
-			set(&resultant_force,0.0,0.0);
-			set(&resultant_vector,0.0,0.0);
-			for (j = 0; j < ttl_trajs; j++) 
-			{
-				resultant(&(t[j]),&p[part_index], &resultant_vector);
-				sum_void(&resultant_force, &resultant_vector, &resultant_force);
-			}
-			set(&resultant_force, -resultant_force.x, -resultant_force.y);
-			update_particle(&p[part_index], &resultant_force);
-		}
-		//}																// !!!!!!!!!!!!!!!!!!!!! paralelizar
 
+		Vector2D resultant_force;
+		set(&resultant_force,0.0,0.0);
+		float rx=0.0, ry=0.0;
+		for (i = 0; i < ttl_trajs; i++) 
+		{
+			sh_dist_p_t[part_index][i] = distance(&sh_part[part_index].location,&t[i]);	// calcular distancias
+			resultant_(&(t[i]),&sh_part[part_index], &resultant_force, sh_dist_p_t[part_index][i]);
+			rx+=resultant_force.x;
+			ry+=resultant_force.y;
+		}
+	
+		set(&resultant_force, -rx, -ry);
+		update_particle(&sh_part[part_index], &resultant_force);
 		
 
-		__syncthreads();
+		
 	
 
 		// ---------------------------
 		// *** CALCULO DE TRAJETORIAS SATISFEITAS ***
 		// ---------------------------
-		dev_psirt->particles[part_index].current_trajectories = 0; 	// zera #traj de cada particula
+		sh_part[part_index].current_trajectories = 0; 	// zera #traj de cada particula
+		
+		for (i=0;i<ttl_trajs; i++)  t[i].n_particulas_atual = 0;
+		__syncthreads();
+
 		for (i=0;i<ttl_trajs; i++) 
 		{
-			t[i].n_particulas_atual = 0;
-			float distance_point_line = distance(&p[part_index].location,&t[i]);
-			if (distance_point_line<TRAJ_PART_THRESHOLD)
+			//if (distance(&sh_part[part_index].location,&t[i])<TRAJ_PART_THRESHOLD)
+			if (sh_dist_p_t[part_index][i] < TRAJ_PART_THRESHOLD)
 			{
-				atomicAdd(&(t[i].n_particulas_atual), 1);
-				p[part_index].current_trajectories++;
-			}
+				atomicAdd(&t[i].n_particulas_atual, 1);
+				sh_part[part_index].current_trajectories++;
+			}				
 		}
 		
-		__syncthreads();
+
 		int stable = 0;
 		for (i=0;i<ttl_trajs;i++)  if (t[i].n_particulas_atual>=t[i].n_particulas_estavel)	stable ++;
 		
-
+		__syncthreads();
 		
 		if (stable==ttl_trajs) // is stable					*************(trecho ok)
 		{
 			done = 1;
-
+			// filtragem rápida
+			if (sh_part[part_index].current_trajectories == 0 ) sh_part[part_index].status = DEAD;
 		}
 
 		
 	}
-
+	p[part_index] = sh_part[part_index];
 	*iter = lim;
 }
-
 

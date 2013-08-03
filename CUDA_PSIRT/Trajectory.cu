@@ -175,3 +175,15 @@ __host__ __device__ inline void resultant(Trajectory *t, Particle* p, Vector2D *
 
 	mult_constant_void(resultant,force);
 }
+
+__device__ inline void resultant_(Trajectory *t, Particle* p, Vector2D *resultant, float dist)
+{
+	directionFrom(&p->location, t, resultant);
+	// Calculate force according to F = m1*m2/r²
+	float force = 0;
+	if (dist>TRAJ_PART_THRESHOLD) {
+		force = ( trajectory_force(t) * PARTICLE_MASS) / (dist*dist*10);
+		mult_constant_void(resultant,force);
+	}
+	
+}
