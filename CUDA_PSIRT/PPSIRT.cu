@@ -36,7 +36,7 @@ __global__ void ppsirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_p
 
 	while (!done)
 	{
-		if (part_index==0) lim++;
+		atomicAdd(&lim, 1);
 			// ---------------------------
 		// *** ATUALIZAR POSICOES DAS PARTICULAS ***
 		// ---------------------------
@@ -66,22 +66,15 @@ __global__ void ppsirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_p
 		// ---------------------------
 		// *** CALCULO DE TRAJETORIAS SATISFEITAS ***
 		// ---------------------------
-		for (i=0;i<dev_psirt->n_particles;i++) dev_psirt->particles[i].current_trajectories = 0; 	// zera #traj de cada particula
+		dev_psirt->particles[part_index].current_trajectories = 0; 	// zera #traj de cada particula
 		for (i=0;i<ttl_trajs; i++) 
 		{
 			t[i].n_particulas_atual = 0;
-			for (j=0; j<npart; j++)																	// !!!!!!!!!!!!!!!!!!!!! paralelizar
+			float distance_point_line = distance(&p[part_index].location,&t[i]);
+			if (distance_point_line<TRAJ_PART_THRESHOLD)
 			{
-				if (p[j].status == ALIVE)
-				{
-					float distance_point_line = distance(&p[j].location,&t[i]);
-					if (distance_point_line<TRAJ_PART_THRESHOLD)
-					{
-						t[i].n_particulas_atual++;
-						p[j].current_trajectories++;
-					}
-				}
-				
+				atomicAdd(&(t[i].n_particulas_atual), 1);
+				p[part_index].current_trajectories++;
 			}
 		}
 		
