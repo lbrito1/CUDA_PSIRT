@@ -3,6 +3,12 @@
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 
+#define STATUS_STARTING -1
+#define STATUS_RUNNING 0
+#define STATUS_CONVERGED 1
+#define STATUS_OPTIMIZING 2
+#define STATUS_OPTIMIZED 3
+
 
 __global__ void ppsirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_psirt, int* iter)
 {
@@ -28,13 +34,13 @@ __global__ void ppsirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_p
 	int npart = dev_psirt->n_particles;
 	int ttl_trajs = dev_psirt->n_trajectories * dev_psirt->n_projections;
 
-	int done = 0;
+	int status = STATUS_STARTING;
 	int lim = 0;
 
 	double ttl_time_p1 = 0;
 	double ttl_time_p2 = 0;
 
-	while (!done)
+	while (status != STATUS_CONVERGED)
 	{
 		atomicAdd(&lim, 1);
 			// ---------------------------
@@ -86,7 +92,7 @@ __global__ void ppsirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_p
 		
 		if (stable==ttl_trajs) // is stable					*************(trecho ok)
 		{
-			done = 1;
+			status = STATUS_CONVERGED;
 
 		}
 
