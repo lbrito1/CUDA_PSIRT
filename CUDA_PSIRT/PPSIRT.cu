@@ -9,13 +9,14 @@
 #define STATUS_OPTIMIZING 2
 #define STATUS_OPTIMIZED 3
 
+#define NPART 64
 
 __global__ void ppsirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_psirt, int* iter)
 {
 	*iter = 0;
 
 	// Indice da partícula a ser tratada nesta thread
-	int part_index = blockIdx.x * blockDim.x + threadIdx.x;
+	int tid = blockIdx.x * blockDim.x + threadIdx.x;
 
 	dev_psirt->particles = p;
 	dev_psirt->trajectories = t;
@@ -34,14 +35,27 @@ __global__ void ppsirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_p
 	int npart = dev_psirt->n_particles;
 	int ttl_trajs = dev_psirt->n_trajectories * dev_psirt->n_projections;
 
-	int status = STATUS_STARTING;
+	__shared__ int status;
+	status = STATUS_STARTING;
 	int lim = 0;
 
 	double ttl_time_p1 = 0;
 	double ttl_time_p2 = 0;
 
-	while (status != STATUS_CONVERGED)
+	__shared__ int optim_lock;
+	optim_lock = -1;
+	__shared__ int parts_optimized;
+	parts_optimized = 0;
+
+
+	atomicCAS(&status, STATUS_STARTING, STATUS_RUNNING);
+	__syncthreads();
+
+	while (parts_optimized <= NPART)
 	{
+		
+
+
 		atomicAdd(&lim, 1);
 			// ---------------------------
 		// *** ATUALIZAR POSICOES DAS PARTICULAS ***
@@ -50,17 +64,17 @@ __global__ void ppsirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_p
 		Vector2D resultant_force, resultant_vector;
 		//for (i = 0; i < dev_psirt->n_particles; i++) 
 		//{
-		if (p[part_index].status != DEAD) 
+		if (p[tid].status != DEAD) 
 		{		
 			set(&resultant_force,0.0,0.0);
 			set(&resultant_vector,0.0,0.0);
 			for (j = 0; j < ttl_trajs; j++) 
 			{
-				resultant(&(t[j]),&p[part_index], &resultant_vector);
+				resultant(&(t[j]),&p[tid], &resultant_vector);
 				sum_void(&resultant_force, &resultant_vector, &resultant_force);
 			}
 			set(&resultant_force, -resultant_force.x, -resultant_force.y);
-			update_particle(&p[part_index], &resultant_force);
+			update_particle(&p[tid], &resultant_force);
 		}
 		//}																// !!!!!!!!!!!!!!!!!!!!! paralelizar
 
@@ -72,15 +86,18 @@ __global__ void ppsirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_p
 		// ---------------------------
 		// *** CALCULO DE TRAJETORIAS SATISFEITAS ***
 		// ---------------------------
-		dev_psirt->particles[part_index].current_trajectories = 0; 	// zera #traj de cada particula
+		dev_psirt->particles[tid].current_trajectories = 0; 	// zera #traj de cada particula
 		for (i=0;i<ttl_trajs; i++) 
 		{
-			t[i].n_particulas_atual = 0;
-			float distance_point_line = distance(&p[part_index].location,&t[i]);
-			if (distance_point_line<TRAJ_PART_THRESHOLD)
+			if (p[tid].status == ALIVE) 
 			{
-				atomicAdd(&(t[i].n_particulas_atual), 1);
-				p[part_index].current_trajectories++;
+				t[i].n_particulas_atual = 0;
+				float distance_point_line = distance(&p[tid].location,&t[i]);
+				if (distance_point_line<TRAJ_PART_THRESHOLD)
+				{
+					atomicAdd(&(t[i].n_particulas_atual), 1);
+					p[tid].current_trajectories++;
+				}
 			}
 		}
 		
@@ -88,14 +105,46 @@ __global__ void ppsirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_p
 		int stable = 0;
 		for (i=0;i<ttl_trajs;i++)  if (t[i].n_particulas_atual>=t[i].n_particulas_estavel)	stable ++;
 		
+		atomicCAS(&optim_lock, -1, tid);	//tenta pegar o lock; quem conseguir comeca a otimizar 
 
-		
-		if (stable==ttl_trajs) // is stable					*************(trecho ok)
+	
+
+		// converged
+		if (stable==ttl_trajs) 
 		{
-			status = STATUS_CONVERGED;
+			atomicCAS(&status, STATUS_RUNNING, STATUS_CONVERGED);	// comecou a otimizar agora
 
+			if (status == STATUS_OPTIMIZING && optim_lock==tid) // convergiu sem a particula: remover
+			{
+				p[tid].status = DEAD;
+				atomicAdd(&parts_optimized, 1);
+				atomicCAS(&status, STATUS_OPTIMIZING, STATUS_CONVERGED);
+				atomicCAS(&optim_lock, tid, -1); // terminou de otimizar: liberar lock
+			}
+			else if (status == STATUS_CONVERGED && optim_lock==tid)	// comecar a otimizar
+			{
+				if (optim_lock==tid) {			//se conseguiu pegar o lock
+					p[tid].status = CHECKING;
+					atomicCAS(&status, STATUS_CONVERGED, STATUS_OPTIMIZING);
+					
+				}
+			}
 		}
-
+		// did not converge
+		else 	
+		{
+			if (status == STATUS_OPTIMIZING && optim_lock==tid) 
+			{
+				if(++optim_curr_iteration > optim_max_iterations)	// nao convergiu sem a particula: manter
+				{
+					p[tid].status = ALIVE;
+					atomicAdd(&parts_optimized, 1);
+					atomicCAS(&status, STATUS_OPTIMIZING, STATUS_CONVERGED);
+					atomicCAS(&optim_lock, tid, -1); // terminou de otimizar: liberar lock
+				}
+			}
+		}
+		__syncthreads();
 		
 	}
 

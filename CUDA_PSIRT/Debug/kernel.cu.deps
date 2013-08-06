@@ -235,24 +235,24 @@ c:\program files\nvidia gpu computing toolkit\cuda\v5.0\include\host_defines.h
 c:\program files\nvidia gpu computing toolkit\cuda\v5.0\include\vector_functions.h
 c:\program files\nvidia gpu computing toolkit\cuda\v5.0\include\device_launch_parameters.h
 c:\program files\nvidia gpu computing toolkit\cuda\v5.0\include\vector_types.h
-c:\code\tg\cuda\cuda_psirt\cuda_psirt\PPSIRT.cu
-c:\code\tg\cuda\cuda_psirt\cuda_psirt\Reconstruction.c
+c:\code\tg\cuda\new\cuda_psirt\cuda_psirt\PPSIRT.cu
+c:\code\tg\cuda\new\cuda_psirt\cuda_psirt\Reconstruction.c
 c:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\include\stdio.h
 c:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\include\crtdefs.h
 c:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\include\swprintf.inl
 c:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\include\math.h
-c:\code\tg\cuda\cuda_psirt\cuda_psirt\CUDA_utils.cu
-c:\code\tg\cuda\cuda_psirt\cuda_psirt\PSIRT.cu
-c:\code\tg\cuda\cuda_psirt\cuda_psirt\ProjectionController.cu
-c:\code\tg\cuda\cuda_psirt\cuda_psirt\Projection.cu
-c:\code\tg\cuda\cuda_psirt\cuda_psirt\Trajectory.cu
-c:\code\tg\cuda\cuda_psirt\cuda_psirt\Particle.cu
-c:\code\tg\cuda\cuda_psirt\cuda_psirt\Vector2D.cu
+c:\code\tg\cuda\new\cuda_psirt\cuda_psirt\CUDA_utils.cu
+c:\code\tg\cuda\new\cuda_psirt\cuda_psirt\PSIRT.cu
+c:\code\tg\cuda\new\cuda_psirt\cuda_psirt\ProjectionController.cu
+c:\code\tg\cuda\new\cuda_psirt\cuda_psirt\Projection.cu
+c:\code\tg\cuda\new\cuda_psirt\cuda_psirt\Trajectory.cu
+c:\code\tg\cuda\new\cuda_psirt\cuda_psirt\Particle.cu
+c:\code\tg\cuda\new\cuda_psirt\cuda_psirt\Vector2D.cu
 C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v5.0\include\cuda.h
 C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v5.0\include\cuda_runtime.h
 c:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\include\math.h
 c:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\include\cstdio
-c:\code\tg\cuda\cuda_psirt\cuda_psirt\bmpfile.h
+c:\code\tg\cuda\new\cuda_psirt\cuda_psirt\bmpfile.h
 C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v5.0\include\cuda.h
 C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v5.0\include\cuda_runtime.h
 C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v5.0\include\device_launch_parameters.h
