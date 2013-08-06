@@ -9,6 +9,9 @@
 #define STATUS_OPTIMIZING 2
 #define STATUS_OPTIMIZED 3
 
+#define NPART 64
+#define NTRAJ 21
+
 
 __global__ void ppsirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_psirt, int* iter)
 {
@@ -28,8 +31,12 @@ __global__ void ppsirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_p
 	int is_optimizing_dirty_particle = 0;
 	int optim_is_ranked = 0;
 	int optim_curr_part = 0;
-	int optim_curr_iteration = 0;
+	
 	int optim_max_iterations = 100;
+
+	Particle sh_p [NPART];
+	sh_p[part_index] = p[part_index];
+	__syncthreads();
 
 	int npart = dev_psirt->n_particles;
 	int ttl_trajs = dev_psirt->n_trajectories * dev_psirt->n_projections;
@@ -48,24 +55,19 @@ __global__ void ppsirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_p
 		// ---------------------------
 		int i=0,j=0;
 		Vector2D resultant_force, resultant_vector;
-		//for (i = 0; i < dev_psirt->n_particles; i++) 
-		//{
-		if (p[part_index].status != DEAD) 
+		if (sh_p[part_index].status != DEAD) 
 		{		
 			set(&resultant_force,0.0,0.0);
 			set(&resultant_vector,0.0,0.0);
 			for (j = 0; j < ttl_trajs; j++) 
 			{
-				resultant(&(t[j]),&p[part_index], &resultant_vector);
+				resultant(&(t[j]),&sh_p[part_index], &resultant_vector);
 				sum_void(&resultant_force, &resultant_vector, &resultant_force);
 			}
 			set(&resultant_force, -resultant_force.x, -resultant_force.y);
-			update_particle(&p[part_index], &resultant_force);
+			update_particle(&sh_p[part_index], &resultant_force);
 		}
-		//}																// !!!!!!!!!!!!!!!!!!!!! paralelizar
-
-		
-
+	
 		__syncthreads();
 	
 
@@ -76,11 +78,11 @@ __global__ void ppsirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_p
 		for (i=0;i<ttl_trajs; i++) 
 		{
 			t[i].n_particulas_atual = 0;
-			float distance_point_line = distance(&p[part_index].location,&t[i]);
+			float distance_point_line = distance(&sh_p[part_index].location,&t[i]);
 			if (distance_point_line<TRAJ_PART_THRESHOLD)
 			{
 				atomicAdd(&(t[i].n_particulas_atual), 1);
-				p[part_index].current_trajectories++;
+				sh_p[part_index].current_trajectories++;
 			}
 		}
 		
@@ -96,8 +98,20 @@ __global__ void ppsirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_p
 
 		}
 
+		//otimizar
+	//	if (status == STATUS_CONVERGED) status = STATUS_OPTIMIZING;
+		if (status == STATUS_OPTIMIZING)
+		{
+		//	int max
+		}
+
+		
+
 		
 	}
+
+	p[part_index] = sh_p[part_index];
+	__syncthreads();
 
 	*iter = lim;
 }
