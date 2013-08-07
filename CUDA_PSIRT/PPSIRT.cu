@@ -3,15 +3,24 @@
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 
-#define STATUS_STARTING -1
+#define STATUS_STARTING 10
 #define STATUS_RUNNING 0
 #define STATUS_CONVERGED 1
 #define STATUS_OPTIMIZING 2
 #define STATUS_OPTIMIZED 3
 
-#define NPART 64
+#define OPT_UNLOCKED -1
 
-__global__ void ppsirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_psirt, int* iter)
+
+__global__ void dummy(int* x)
+{
+	atomicAdd(x,1);
+	atomicCAS(x,1,10);
+	atomicCAS(x,10,11);
+	atomicCAS(x,11,12);
+}
+
+__global__ void ppsirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_psirt, int* iter, int* status, int* optim_lock, int* parts_optimized)
 {
 	*iter = 0;
 
@@ -35,27 +44,17 @@ __global__ void ppsirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_p
 	int npart = dev_psirt->n_particles;
 	int ttl_trajs = dev_psirt->n_trajectories * dev_psirt->n_projections;
 
-	__shared__ int status;
-	status = STATUS_STARTING;
-	int lim = 0;
-
 	double ttl_time_p1 = 0;
 	double ttl_time_p2 = 0;
 
-	__shared__ int optim_lock;
-	optim_lock = -1;
-	__shared__ int parts_optimized;
-	parts_optimized = 0;
+	__shared__ int lim;
+	lim=0;
+
+	atomicCAS(status, STATUS_STARTING, STATUS_RUNNING);
 
 
-	atomicCAS(&status, STATUS_STARTING, STATUS_RUNNING);
-	__syncthreads();
-
-	while (parts_optimized <= NPART)
+	while (*parts_optimized <= dev_psirt->n_particles)
 	{
-		
-
-
 		atomicAdd(&lim, 1);
 			// ---------------------------
 		// *** ATUALIZAR POSICOES DAS PARTICULAS ***
@@ -105,27 +104,27 @@ __global__ void ppsirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_p
 		int stable = 0;
 		for (i=0;i<ttl_trajs;i++)  if (t[i].n_particulas_atual>=t[i].n_particulas_estavel)	stable ++;
 		
-		atomicCAS(&optim_lock, -1, tid);	//tenta pegar o lock; quem conseguir comeca a otimizar 
+		atomicCAS(optim_lock, OPT_UNLOCKED, tid);	//tenta pegar o lock; quem conseguir comeca a otimizar 
 
 	
-
+		__syncthreads();
 		// converged
 		if (stable==ttl_trajs) 
 		{
-			atomicCAS(&status, STATUS_RUNNING, STATUS_CONVERGED);	// comecou a otimizar agora
+			atomicCAS(status, STATUS_RUNNING, STATUS_CONVERGED);	// comecou a otimizar agora
 
-			if (status == STATUS_OPTIMIZING && optim_lock==tid) // convergiu sem a particula: remover
+			if (*status == STATUS_OPTIMIZING && *optim_lock==tid) // convergiu sem a particula: remover
 			{
 				p[tid].status = DEAD;
-				atomicAdd(&parts_optimized, 1);
-				atomicCAS(&status, STATUS_OPTIMIZING, STATUS_CONVERGED);
-				atomicCAS(&optim_lock, tid, -1); // terminou de otimizar: liberar lock
+				atomicAdd(parts_optimized, 1);
+				atomicCAS(status, STATUS_OPTIMIZING, STATUS_CONVERGED);
+				atomicCAS(optim_lock, tid, OPT_UNLOCKED); // terminou de otimizar: liberar lock
 			}
-			else if (status == STATUS_CONVERGED && optim_lock==tid)	// comecar a otimizar
+			else if (*status == STATUS_CONVERGED && *optim_lock==tid)	// comecar a otimizar
 			{
-				if (optim_lock==tid) {			//se conseguiu pegar o lock
+				if (*optim_lock==tid) {			//se conseguiu pegar o lock
 					p[tid].status = CHECKING;
-					atomicCAS(&status, STATUS_CONVERGED, STATUS_OPTIMIZING);
+					atomicCAS(status, STATUS_CONVERGED, STATUS_OPTIMIZING);
 					
 				}
 			}
@@ -133,21 +132,21 @@ __global__ void ppsirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_p
 		// did not converge
 		else 	
 		{
-			if (status == STATUS_OPTIMIZING && optim_lock==tid) 
+			if (*status == STATUS_OPTIMIZING && *optim_lock==tid) 
 			{
 				if(++optim_curr_iteration > optim_max_iterations)	// nao convergiu sem a particula: manter
 				{
 					p[tid].status = ALIVE;
-					atomicAdd(&parts_optimized, 1);
-					atomicCAS(&status, STATUS_OPTIMIZING, STATUS_CONVERGED);
-					atomicCAS(&optim_lock, tid, -1); // terminou de otimizar: liberar lock
+					atomicAdd(parts_optimized, 1);
+					atomicCAS(status, STATUS_OPTIMIZING, STATUS_CONVERGED);
+					atomicCAS(optim_lock, tid, -1); // terminou de otimizar: liberar lock
 				}
 			}
 		}
 		__syncthreads();
 		
 	}
-
+	__syncthreads();
 	*iter = lim;
 }
 

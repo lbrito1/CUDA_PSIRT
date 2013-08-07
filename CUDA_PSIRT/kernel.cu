@@ -232,20 +232,25 @@ void cuda_psirt(PSIRT* host_psirt)
 	GPUerrchk(cudaMemcpy(part, host_psirt->particles, sizeof(Particle) * n_part, cudaMemcpyHostToDevice));
 
 	// 2. PARAMETROS AUXILIARES
-	int params[] = {n_proj, n_traj, n_part};
+	int params[] = {n_proj, n_traj, n_part, STATUS_STARTING, OPT_UNLOCKED, 0};
 	int *dev_params;
-	GPUerrchk(cudaMalloc((void**)&dev_params, sizeof(int)*3));
-	GPUerrchk(cudaMemcpy(dev_params,params,sizeof(int)*3,cudaMemcpyHostToDevice));
+	GPUerrchk(cudaMalloc((void**)&dev_params, sizeof(unsigned int)*6));
+	GPUerrchk(cudaMemcpy(dev_params,params,sizeof(unsigned int)*6,cudaMemcpyHostToDevice));
 	
+	
+
+
 	// 3. EXECUTAR
 	PSIRT* dev_psirt;
 	GPUerrchk(cudaMalloc((void**)&dev_psirt, sizeof(PSIRT)));
 
 	// PARAMETROS DE PROFILING
 	int *dev_iter;
+	int zzz = 0;
 	GPUerrchk(cudaMalloc((void**)&dev_iter, sizeof(int)));
+	GPUerrchk(cudaMemcpy(dev_iter, &zzz, sizeof(int), cudaMemcpyHostToDevice));
 
-
+	dummy<<<1,1>>>(dev_iter);
 	// (parametros de paralelização)
 	int n_elements = host_psirt->n_particles;
 	int n_threads_per_block = 32;
@@ -276,22 +281,39 @@ void cuda_psirt(PSIRT* host_psirt)
 	GPUerrchk(cudaMemcpy(part, host_psirt->particles, sizeof(Particle) * n_part, cudaMemcpyHostToDevice));
 	
 
+
+	//mais params
+	int status = STATUS_STARTING;
+	int optim_current_part = 0;
+	int lock = OPT_UNLOCKED;
+
+	int *d_st, *d_ocp, *d_lock;
+
+	GPUerrchk(cudaMalloc((void**)&d_st, sizeof(int)));
+	GPUerrchk(cudaMemcpy(d_st, &status, sizeof(int), cudaMemcpyHostToDevice));
+
+	GPUerrchk(cudaMalloc((void**)&d_ocp, sizeof(int)));
+	GPUerrchk(cudaMemcpy(d_ocp, &optim_current_part, sizeof(int), cudaMemcpyHostToDevice));
+	
+	GPUerrchk(cudaMalloc((void**)&d_lock, sizeof(int)));
+	GPUerrchk(cudaMemcpy(d_lock, &lock, sizeof(int), cudaMemcpyHostToDevice));
+
 	// CUDA parallel run
 	cudaEventRecord(start_paralel,0);
 	int iter_par = 0;
-	ppsirt<<<1, n_elements>>>(traj, part, dev_params, dev_psirt, dev_iter);
+	ppsirt<<<1, n_elements>>>(traj, part, dev_params, dev_psirt, dev_iter, d_st, d_ocp, d_lock);
 	cudaDeviceSynchronize();
 	cudaEventRecord(stop_paralel,0);
 	cudaEventSynchronize(stop_paralel);
 	GPUerrchk(cudaMemcpy(&iter_par, dev_iter, sizeof(int), cudaMemcpyDeviceToHost));
-
+	
 	
 	// CPU pure run
 	clock_t start, end;
     float ms_cpu;
 	int iter_cpu = 0;
 	start = clock();
-	while(!run_psirt_cpu_no_optim(host_psirt,iter_cpu++));		
+	//while(!run_psirt_cpu_no_optim(host_psirt,iter_cpu++));		
 	end = clock();
 	ms_cpu = (float) (((double) (end - start)) / CLOCKS_PER_SEC);
 
@@ -312,6 +334,7 @@ void cuda_psirt(PSIRT* host_psirt)
 	// 4. COPIAR DE VOLTA
 	Particle *host_plist = host_psirt->particles;
 	GPUerrchk(cudaMemcpy( host_plist, part, sizeof(Particle) * n_part, cudaMemcpyDeviceToHost));
+
 }
 
 int main(int argc, char* argv[])
