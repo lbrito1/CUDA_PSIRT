@@ -63,8 +63,6 @@ __global__ void ppsirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_p
 		// ---------------------------
 		int i=0,j=0;
 		Vector2D resultant_force, resultant_vector;
-		//for (i = 0; i < dev_psirt->n_particles; i++) 
-		//{
 		if (p[tid].status != DEAD) 
 		{		
 			set(&resultant_force,0.0,0.0);
@@ -77,13 +75,7 @@ __global__ void ppsirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_p
 			set(&resultant_force, -resultant_force.x, -resultant_force.y);
 			update_particle(&p[tid], &resultant_force);
 		}
-		//}																// !!!!!!!!!!!!!!!!!!!!! paralelizar
-
 		
-
-		__syncthreads();
-	
-
 		// ---------------------------
 		// *** CALCULO DE TRAJETORIAS SATISFEITAS ***
 		// ---------------------------
