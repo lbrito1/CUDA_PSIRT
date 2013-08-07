@@ -321,7 +321,7 @@ void read_sinogram(PSIRT* psirt)
 		int ttl_traj = (psirt->n_projections * psirt->n_trajectories);
 
 		psirt->trajectories = (Trajectory*) malloc(sizeof(Trajectory) * ttl_traj);
-		printf("\r\n\r\nREADING SINOGRAM\r\n");
+		//printf("\r\n\r\nREADING SINOGRAM\r\n");
 
 		
 		for (k=0,i=0;i<psirt->n_projections;i++)
@@ -330,7 +330,7 @@ void read_sinogram(PSIRT* psirt)
 			{
 				memcpy(&(psirt->trajectories[k]), &(ptemp[i].lista_trajetorias[j]), sizeof(Trajectory));
 				Trajectory t = psirt->trajectories[k];
-				printf("\r\nTRAJ #%d\t%f,%f\t%f,%f",k,t.source.x,t.source.y,t.direction.x,t.direction.y);
+				//printf("\r\nTRAJ #%d\t%f,%f\t%f,%f",k,t.source.x,t.source.y,t.direction.x,t.direction.y);
 			}
 		}
 	}

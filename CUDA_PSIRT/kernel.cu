@@ -127,8 +127,8 @@ __global__ void run_cuda_psirt_singlethread(Trajectory* t, Particle* p, int* dev
 	int npart = dev_psirt->n_particles;
 	int ttl_trajs = dev_psirt->n_trajectories * dev_psirt->n_projections;
 
-	printf("\r\n===========\r\CUDA PSIRT (1x1)\r\n===========\r\nPARAMS:");
-	printf("\t(#PROJ)\t(#TRAJ)\t(NPART)\r\n\t%d\t%d\t%d\r\n\r\n",dev_psirt->n_projections, dev_psirt->n_trajectories, dev_psirt->n_particles);
+	//printf("\r\n===========\r\CUDA PSIRT (1x1)\r\n===========\r\nPARAMS:");
+	//printf("\t(#PROJ)\t(#TRAJ)\t(NPART)\r\n\t%d\t%d\t%d\r\n\r\n",dev_psirt->n_projections, dev_psirt->n_trajectories, dev_psirt->n_particles);
 
 	int done = 0;
 	int lim = 0;
@@ -348,13 +348,17 @@ int main(int argc, char* argv[])
 {
 	// Inicializar CUDA
 	GPUerrchk(cudaSetDevice(0));
-
-	// Preparar parâmetros no host
-	PSIRT* host_psirt = init_psirt();	
+	
+	PSIRT* host_psirt;
+	
 
 	// Passar parâmetros para device, executar & copiar de volta para host
-	cuda_psirt(host_psirt);
-	
+	int i = 0;
+	for (i=0; i<10; i++) {
+		// Preparar parâmetros no host
+		PSIRT* host_psirt = init_psirt();	
+		cuda_psirt(host_psirt);
+	}
 	// Gerar bitmaps
 	draw_projection_bitmap(host_psirt);
 	draw_reconstruction_bitmap(host_psirt);
