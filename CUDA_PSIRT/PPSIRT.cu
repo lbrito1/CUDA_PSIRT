@@ -31,8 +31,9 @@ __global__ void ppsirt(Trajectory* t, Particle* p, int* n_part, int* n_traj, int
 	lim=0;
 	atomicCAS(status, STATUS_STARTING, STATUS_RUNNING);
 
-	while (*parts_optimized < *n_part)
+	if (*parts_optimized < *n_part)
 	{
+		__syncthreads();
 		atomicAdd(&lim, 1);
 			// ---------------------------
 		// *** ATUALIZAR POSICOES DAS PARTICULAS ***
@@ -75,7 +76,7 @@ __global__ void ppsirt(Trajectory* t, Particle* p, int* n_part, int* n_traj, int
 		if (tid<*n_traj) if (t[tid].n_particulas_atual>=t[tid].n_particulas_estavel)	atomicAdd(stable, 1);
 		
 		// so tenta pegar lock se nao foi otimizada
-		if (tid_optim_status != STATUS_OPTIMIZED) {
+		if (tid_optim_status != STATUS_OPTIMIZED & !( (p[tid].status == CHECKED | p[tid].status == DEAD) )  ) {
 			atomicCAS(optim_lock, OPT_UNLOCKED, tid);	//tenta pegar o lock; quem conseguir comeca a otimizar 
 		}
 
@@ -100,6 +101,7 @@ __global__ void ppsirt(Trajectory* t, Particle* p, int* n_part, int* n_traj, int
 					atomicCAS(status, STATUS_CONVERGED, STATUS_OPTIMIZING);
 					
 			}
+			
 		}
 		// did not converge
 		else 	
@@ -116,12 +118,20 @@ __global__ void ppsirt(Trajectory* t, Particle* p, int* n_part, int* n_traj, int
 				}
 			}
 		}
+
+		// checagem final para liberar lock
+		if (p[tid].status == CHECKED | p[tid].status == DEAD) 
+		{
+			atomicCAS(optim_lock, tid, OPT_UNLOCKED);
+		}
 		__syncthreads();
 		
+	}else {
+		atomicExch(status, STATUS_FINISHED);
 	}
 	
 	__syncthreads();
-	atomicExch(status, STATUS_FINISHED);	
+		
 	
 
 	*iter = lim;
