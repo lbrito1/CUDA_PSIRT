@@ -311,7 +311,11 @@ void cuda_psirt(PSIRT* host_psirt)
 	// CUDA parallel run
 	cudaEventRecord(start_paralel,0);
 	int iter_par = 0;
-	ppsirt<<<1, n_elements>>>(traj, part, d_npart, d_ntraj, dev_iter, d_st, d_lock, d_ocp, d_oci, d_tstable);
+	int ppsirt_status = 0;
+	while (ppsirt_status != STATUS_FINISHED) {
+		ppsirt<<<1, n_elements>>>(traj, part, d_npart, d_ntraj, dev_iter, d_st, d_lock, d_ocp, d_oci, d_tstable);
+		cudaMemcpy(&ppsirt_status, d_st, sizeof(int), cudaMemcpyDeviceToHost);
+	}
 	cudaDeviceSynchronize();
 	cudaEventRecord(stop_paralel,0);
 	cudaEventSynchronize(stop_paralel);
@@ -349,16 +353,16 @@ int main(int argc, char* argv[])
 	// Inicializar CUDA
 	GPUerrchk(cudaSetDevice(0));
 	
-	PSIRT* host_psirt;
+	//PSIRT* host_psirt;
 	
 
 	// Passar parâmetros para device, executar & copiar de volta para host
 	int i = 0;
-	for (i=0; i<10; i++) {
+	//for (i=0; i<1; i++) {
 		// Preparar parâmetros no host
 		PSIRT* host_psirt = init_psirt();	
 		cuda_psirt(host_psirt);
-	}
+	//}
 	// Gerar bitmaps
 	draw_projection_bitmap(host_psirt);
 	draw_reconstruction_bitmap(host_psirt);

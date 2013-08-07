@@ -10,6 +10,7 @@
 #define STATUS_CONVERGED 1
 #define STATUS_OPTIMIZING 2
 #define STATUS_OPTIMIZED 3
+#define STATUS_FINISHED 4
 
 #define OPT_UNLOCKED -1
 
@@ -118,8 +119,11 @@ __global__ void ppsirt(Trajectory* t, Particle* p, int* n_part, int* n_traj, int
 		__syncthreads();
 		
 	}
-	__syncthreads();
 	
+	__syncthreads();
+	atomicExch(status, STATUS_FINISHED);	
+	
+
 	*iter = lim;
 }
 
