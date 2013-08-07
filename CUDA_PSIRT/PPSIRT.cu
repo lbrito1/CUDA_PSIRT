@@ -78,8 +78,6 @@ __global__ void ppsirt(Trajectory* t, Particle* p, int* n_part, int* n_traj, int
 			atomicCAS(optim_lock, OPT_UNLOCKED, tid);	//tenta pegar o lock; quem conseguir comeca a otimizar 
 		}
 
-	
-		__syncthreads();
 		// converged
 		if (*stable==*n_traj) 
 		{
