@@ -20,7 +20,7 @@ __global__ void dummy(int* x)
 	atomicCAS(x,11,12);
 }
 
-__global__ void ppsirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_psirt, int* iter, int* status, int* optim_lock, int* parts_optimized)
+__global__ void ppsirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_psirt, int* iter, int* status, int* optim_lock, int* parts_optimized, int* stable)
 {
 	*iter = 0;
 
@@ -94,9 +94,9 @@ __global__ void ppsirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_p
 			}
 		}
 		
+		atomicExch(stable, 0);
 		__syncthreads();
-		int stable = 0;
-		for (i=0;i<ttl_trajs;i++)  if (t[i].n_particulas_atual>=t[i].n_particulas_estavel)	stable ++;
+		if (tid<ttl_trajs) if (t[tid].n_particulas_atual>=t[tid].n_particulas_estavel)	atomicAdd(stable, 1);
 		
 		// so tenta pegar lock se nao foi otimizada
 		if (tid_optim_status != STATUS_OPTIMIZED) {
@@ -106,7 +106,7 @@ __global__ void ppsirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_p
 	
 		__syncthreads();
 		// converged
-		if (stable==ttl_trajs) 
+		if (*stable==ttl_trajs) 
 		{
 			atomicCAS(status, STATUS_RUNNING, STATUS_CONVERGED);	// comecou a otimizar agora
 
