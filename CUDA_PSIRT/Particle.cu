@@ -8,6 +8,7 @@
 #define DEAD 	 0
 #define ALIVE 	 1
 #define CHECKING 2
+#define CHECKED  3
 
 
 #define PARTICLE_MASS 0.01

@@ -140,7 +140,7 @@ __host__ __device__ void update_trajectory(Trajectory *t, Particle *p, int npart
 	int i=0;
 	for (i=0; i<nparticle; i++)
 	{
-		if (p[i].status == ALIVE)
+		if (p[i].status == ALIVE | p[i].status == CHECKED)
 		{
 			// Find distance from point to line segment (orthogonal)
 			float distance_point_line = distance(&p[i].location,t);

@@ -301,7 +301,7 @@ void cuda_psirt(PSIRT* host_psirt)
 	// CUDA parallel run
 	cudaEventRecord(start_paralel,0);
 	int iter_par = 0;
-	ppsirt<<<1, n_elements>>>(traj, part, dev_params, dev_psirt, dev_iter, d_st, d_ocp, d_lock);
+	ppsirt<<<1, n_elements>>>(traj, part, dev_params, dev_psirt, dev_iter, d_st, d_lock, d_ocp);
 	cudaDeviceSynchronize();
 	cudaEventRecord(stop_paralel,0);
 	cudaEventSynchronize(stop_paralel);
