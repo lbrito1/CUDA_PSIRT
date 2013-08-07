@@ -124,12 +124,6 @@ __global__ void ppsirt(Trajectory* t, Particle* p, int* n_part, int* n_traj, int
 		{
 			atomicCAS(optim_lock, tid, OPT_UNLOCKED);
 		}
-		__syncthreads();
-
-
-
-
-		
 		
 	}else {
 		atomicExch(status, STATUS_FINISHED);
