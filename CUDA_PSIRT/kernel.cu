@@ -250,7 +250,6 @@ void cuda_psirt(PSIRT* host_psirt)
 	GPUerrchk(cudaMalloc((void**)&dev_iter, sizeof(int)));
 	GPUerrchk(cudaMemcpy(dev_iter, &zzz, sizeof(int), cudaMemcpyHostToDevice));
 
-	dummy<<<1,1>>>(dev_iter);
 	// (parametros de paralelização)
 	int n_elements = host_psirt->n_particles;
 	int n_threads_per_block = 32;
@@ -284,27 +283,35 @@ void cuda_psirt(PSIRT* host_psirt)
 
 	//mais params
 	int status = STATUS_STARTING;
-	int optim_current_part = 0;
+	int zero = 0;
 	int lock = OPT_UNLOCKED;
 
-	int *d_st, *d_ocp, *d_lock, *d_tstable;
+	int *d_st, *d_ocp, *d_lock, *d_tstable, *d_ntraj, *d_npart, *d_oci;
 
 	GPUerrchk(cudaMalloc((void**)&d_st, sizeof(int)));
 	GPUerrchk(cudaMemcpy(d_st, &status, sizeof(int), cudaMemcpyHostToDevice));
 
 	GPUerrchk(cudaMalloc((void**)&d_ocp, sizeof(int)));
-	GPUerrchk(cudaMemcpy(d_ocp, &optim_current_part, sizeof(int), cudaMemcpyHostToDevice));
+	GPUerrchk(cudaMemcpy(d_ocp, &zero, sizeof(int), cudaMemcpyHostToDevice));
 	
 	GPUerrchk(cudaMalloc((void**)&d_lock, sizeof(int)));
 	GPUerrchk(cudaMemcpy(d_lock, &lock, sizeof(int), cudaMemcpyHostToDevice));
 
 	GPUerrchk(cudaMalloc((void**)&d_tstable, sizeof(int)));
 
+	GPUerrchk(cudaMalloc((void**)&d_ntraj, sizeof(int)));
+	GPUerrchk(cudaMemcpy(d_ntraj, &n_ttl_traj, sizeof(int), cudaMemcpyHostToDevice));
+	
+	GPUerrchk(cudaMalloc((void**)&d_npart, sizeof(int)));
+	GPUerrchk(cudaMemcpy(d_npart, &n_part, sizeof(int), cudaMemcpyHostToDevice));
+		
+	GPUerrchk(cudaMalloc((void**)&d_oci, sizeof(int)));
+	GPUerrchk(cudaMemcpy(d_oci, &zero, sizeof(int), cudaMemcpyHostToDevice));
 
 	// CUDA parallel run
 	cudaEventRecord(start_paralel,0);
 	int iter_par = 0;
-	ppsirt<<<1, n_elements>>>(traj, part, dev_params, dev_psirt, dev_iter, d_st, d_lock, d_ocp, d_tstable);
+	ppsirt<<<1, n_elements>>>(traj, part, d_npart, d_ntraj, dev_iter, d_st, d_lock, d_ocp, d_oci, d_tstable);
 	cudaDeviceSynchronize();
 	cudaEventRecord(stop_paralel,0);
 	cudaEventSynchronize(stop_paralel);
@@ -337,7 +344,7 @@ void cuda_psirt(PSIRT* host_psirt)
 	// 4. COPIAR DE VOLTA
 	Particle *host_plist = host_psirt->particles;
 	GPUerrchk(cudaMemcpy( host_plist, part, sizeof(Particle) * n_part, cudaMemcpyDeviceToHost));
-
+	dummy<<<1,1>>>();
 }
 
 int main(int argc, char* argv[])

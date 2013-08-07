@@ -3,6 +3,8 @@
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 
+#define MAX_ITER 100
+
 #define STATUS_STARTING 10
 #define STATUS_RUNNING 0
 #define STATUS_CONVERGED 1
@@ -12,50 +14,23 @@
 #define OPT_UNLOCKED -1
 
 
-__global__ void dummy(int* x)
+__global__ void dummy()
 {
-	atomicAdd(x,1);
-	atomicCAS(x,1,10);
-	atomicCAS(x,10,11);
-	atomicCAS(x,11,12);
+	int x = 0;
+	x++;
 }
 
-__global__ void ppsirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_psirt, int* iter, int* status, int* optim_lock, int* parts_optimized, int* stable)
+__global__ void ppsirt(Trajectory* t, Particle* p, int* n_part, int* n_traj, int* iter, int* status, int* optim_lock, int* parts_optimized, int* optim_curr_iteration, int* stable)
 {
 	*iter = 0;
-
 	// Indice da partícula a ser tratada nesta thread
 	int tid = blockIdx.x * blockDim.x + threadIdx.x;
-
-	dev_psirt->particles = p;
-	dev_psirt->trajectories = t;
-	
-	dev_psirt->n_projections = dev_params[0];
-	dev_psirt->n_trajectories = dev_params[1];
-	dev_psirt->n_particles = dev_params[2];
-
-	int is_optimized = 0;
-	int is_optimizing_dirty_particle = 0;
-	int optim_is_ranked = 0;
-	int optim_curr_part = 0;
-	int optim_curr_iteration = 0;
-	int optim_max_iterations = 100;
-
-	int npart = dev_psirt->n_particles;
-	int ttl_trajs = dev_psirt->n_trajectories * dev_psirt->n_projections;
-
-	double ttl_time_p1 = 0;
-	double ttl_time_p2 = 0;
-
 	int tid_optim_status = STATUS_OPTIMIZING;
-
 	__shared__ int lim;
 	lim=0;
-
 	atomicCAS(status, STATUS_STARTING, STATUS_RUNNING);
 
-
-	while (*parts_optimized < dev_psirt->n_particles)
+	while (*parts_optimized < *n_part)
 	{
 		atomicAdd(&lim, 1);
 			// ---------------------------
@@ -67,7 +42,7 @@ __global__ void ppsirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_p
 		{		
 			set(&resultant_force,0.0,0.0);
 			set(&resultant_vector,0.0,0.0);
-			for (j = 0; j < ttl_trajs; j++) 
+			for (j = 0; j < *n_traj; j++) 
 			{
 				resultant(&(t[j]),&p[tid], &resultant_vector);
 				sum_void(&resultant_force, &resultant_vector, &resultant_force);
@@ -79,8 +54,8 @@ __global__ void ppsirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_p
 		// ---------------------------
 		// *** CALCULO DE TRAJETORIAS SATISFEITAS ***
 		// ---------------------------
-		dev_psirt->particles[tid].current_trajectories = 0; 	// zera #traj de cada particula
-		for (i=0;i<ttl_trajs; i++) 
+		p[tid].current_trajectories = 0; 	// zera #traj de cada particula
+		for (i=0;i<*n_traj; i++) 
 		{
 			if (p[tid].status == ALIVE | p[tid].status == CHECKED) 
 			{
@@ -96,7 +71,7 @@ __global__ void ppsirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_p
 		
 		atomicExch(stable, 0);
 		__syncthreads();
-		if (tid<ttl_trajs) if (t[tid].n_particulas_atual>=t[tid].n_particulas_estavel)	atomicAdd(stable, 1);
+		if (tid<*n_traj) if (t[tid].n_particulas_atual>=t[tid].n_particulas_estavel)	atomicAdd(stable, 1);
 		
 		// so tenta pegar lock se nao foi otimizada
 		if (tid_optim_status != STATUS_OPTIMIZED) {
@@ -106,7 +81,7 @@ __global__ void ppsirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_p
 	
 		__syncthreads();
 		// converged
-		if (*stable==ttl_trajs) 
+		if (*stable==*n_traj) 
 		{
 			atomicCAS(status, STATUS_RUNNING, STATUS_CONVERGED);	// comecou a otimizar agora
 
@@ -130,7 +105,7 @@ __global__ void ppsirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_p
 		{
 			if (*status == STATUS_OPTIMIZING && *optim_lock==tid) 
 			{
-				if(++optim_curr_iteration > optim_max_iterations)	// nao convergiu sem a particula: manter
+				if(++*optim_curr_iteration > MAX_ITER)	// nao convergiu sem a particula: manter
 				{
 					p[tid].status = CHECKED;
 					atomicAdd(parts_optimized, 1);
@@ -144,6 +119,7 @@ __global__ void ppsirt(Trajectory* t, Particle* p, int* dev_params, PSIRT* dev_p
 		
 	}
 	__syncthreads();
+	
 	*iter = lim;
 }
 
