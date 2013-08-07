@@ -53,30 +53,15 @@ __global__ void ppsirt(Trajectory* t, Particle* p, int* n_part, int* n_traj, int
 			update_particle(&p[tid], &resultant_force);
 		}
 		
-		// ---------------------------
-		// *** CALCULO DE TRAJETORIAS SATISFEITAS ***
-		// ---------------------------
-		p[tid].current_trajectories = 0; 	// zera #traj de cada particula
-		for (i=0;i<*n_traj; i++) 
-		{
-			if (p[tid].status == ALIVE | p[tid].status == CHECKED) 
-			{
-				t[i].n_particulas_atual = 0;
-				float distance_point_line = distance(&p[tid].location,&t[i]);
-				if (distance_point_line<TRAJ_PART_THRESHOLD)
-				{
-					atomicAdd(&(t[i].n_particulas_atual), 1);
-					p[tid].current_trajectories++;
-				}
-			}
-		}
-		
+		__syncthreads();
 		
 		
 		// so tenta pegar lock se nao foi otimizada
 		if (tid_optim_status != STATUS_OPTIMIZED & !( (p[tid].status == CHECKED | p[tid].status == DEAD) )  ) {
 			atomicCAS(optim_lock, OPT_UNLOCKED, tid);	//tenta pegar o lock; quem conseguir comeca a otimizar 
 		}
+
+		if (*parts_optimized > 0.7*(*n_part)) atomicExch(parts_optimized, *n_part);		// se nao convergiu depois do limite de tolerancia, encerrar otim
 
 		// converged
 		if (*stable==*n_traj) 
@@ -134,6 +119,34 @@ __global__ void ppsirt(Trajectory* t, Particle* p, int* n_part, int* n_traj, int
 	*iter = lim;
 }
 
+__global__ void ppsirt_zero_traj(Trajectory* t)
+{
+	int tid = blockIdx.x * blockDim.x + threadIdx.x;
+	t[tid].n_particulas_atual = 0;
+}
+
+__global__ void ppsirt_update_traj(Trajectory *t, Particle *p, int* n_traj) 
+{
+	int tid = blockIdx.x * blockDim.x + threadIdx.x, i=0;
+	__syncthreads();
+	// ---------------------------
+	// *** CALCULO DE TRAJETORIAS SATISFEITAS ***
+	// ---------------------------
+	p[tid].current_trajectories = 0; 	// zera #traj de cada particula
+		
+	for (i=0;i<*n_traj; i++) 
+	{
+		if (p[tid].status == ALIVE | p[tid].status == CHECKED) 
+		{
+			float distance_point_line = distance(&p[tid].location,&t[i]);
+			if (distance_point_line<TRAJ_PART_THRESHOLD)
+			{
+				atomicAdd(&(t[i].n_particulas_atual), 1);
+				p[tid].current_trajectories++;
+			}
+		}
+	}
+}
 
 __global__ void ppsirt_chkstable(Trajectory* t, int* stable)
 {
