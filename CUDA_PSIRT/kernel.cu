@@ -316,6 +316,8 @@ void cuda_psirt(PSIRT* host_psirt)
 		ppsirt<<<1, n_elements>>>(traj, part, d_npart, d_ntraj, dev_iter, d_st, d_lock, d_ocp, d_oci, d_tstable);
 		cudaMemcpy(&ppsirt_status, d_st, sizeof(int), cudaMemcpyDeviceToHost);
 		cudaDeviceSynchronize();
+		ppsirt_chkstable<<<1, n_ttl_traj>>>(traj, d_tstable);
+		cudaDeviceSynchronize();
 	}
 	cudaDeviceSynchronize();
 	cudaEventRecord(stop_paralel,0);

@@ -129,9 +129,7 @@ __global__ void ppsirt(Trajectory* t, Particle* p, int* n_part, int* n_traj, int
 
 
 
-		atomicExch(stable, 0);
-		__syncthreads();
-		if (tid<*n_traj) if (t[tid].n_particulas_atual>=t[tid].n_particulas_estavel)	atomicAdd(stable, 1);
+		
 		
 	}else {
 		atomicExch(status, STATUS_FINISHED);
@@ -145,3 +143,11 @@ __global__ void ppsirt(Trajectory* t, Particle* p, int* n_part, int* n_traj, int
 }
 
 
+__global__ void ppsirt_chkstable(Trajectory* t, int* stable)
+{
+	int tid = blockIdx.x * blockDim.x + threadIdx.x;
+	atomicExch(stable, 0);
+	__syncthreads();
+	if (t[tid].n_particulas_atual>=t[tid].n_particulas_estavel)	atomicAdd(stable, 1);
+	__syncthreads();
+}
