@@ -336,10 +336,7 @@ void cuda_psirt(PSIRT* host_psirt)
 	cudaEventDestroy(stop_1);
 	cudaEventDestroy(stop_paralel);
 
-	printf ("\r\nFINALIZOU EXEC CUDA (1x1)\r\n TEMPO DE EXECUCAO FINAL: %fms \t EM %d iters\r\n==============\r\n", ms_1, iter_1x1);
 	printf ("\r\nFINALIZOU EXEC CUDA (%dx%d)\r\n TEMPO DE EXECUCAO FINAL: %fms \t EM %d iters\r\n==============\r\n", n_blocks, n_threads_per_block, ms_par, iter_par);
-	printf("\r\nSpeedup intra-CUDA: %f\%\r\n",( (ms_1/ms_par)*100));
-	printf ("\r\nFINALIZOU EXEC CPU\r\n TEMPO DE EXECUCAO FINAL: %fms \t EM %d iters\r\n==============\r\n", ms_cpu*1000, iter_cpu);
 
 	// 4. COPIAR DE VOLTA
 	Particle *host_plist = host_psirt->particles;
