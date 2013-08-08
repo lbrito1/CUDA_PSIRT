@@ -61,7 +61,7 @@ __global__ void ppsirt(Trajectory* t, Particle* p, int* n_part, int* n_traj, int
 			atomicCAS(optim_lock, OPT_UNLOCKED, tid);	//tenta pegar o lock; quem conseguir comeca a otimizar 
 		}
 
-		if (*parts_optimized > 0.7*(*n_part)) atomicExch(parts_optimized, *n_part);		// se nao convergiu depois do limite de tolerancia, encerrar otim
+		if (*parts_optimized > 0.88*(*n_part)) atomicExch(parts_optimized, *n_part);		// se nao convergiu depois do limite de tolerancia, encerrar otim
 
 		// converged
 		if (*stable==*n_traj) 
