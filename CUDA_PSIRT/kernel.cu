@@ -288,6 +288,11 @@ void cuda_psirt(PSIRT* host_psirt)
 
 	int *d_st, *d_ocp, *d_lock, *d_tstable, *d_ntraj, *d_npart, *d_oci;
 
+	float *dev_dist_pt;
+
+	GPUerrchk(cudaMalloc((void**)&dev_dist_pt, sizeof(float)*n_part));
+
+
 	GPUerrchk(cudaMalloc((void**)&d_st, sizeof(int)));
 	GPUerrchk(cudaMemcpy(d_st, &status, sizeof(int), cudaMemcpyHostToDevice));
 
@@ -308,13 +313,15 @@ void cuda_psirt(PSIRT* host_psirt)
 	GPUerrchk(cudaMalloc((void**)&d_oci, sizeof(int)));
 	GPUerrchk(cudaMemcpy(d_oci, &zero, sizeof(int), cudaMemcpyHostToDevice));
 
+
+
 	// CUDA parallel run
 	cudaEventRecord(start_paralel,0);
 	int iter_par = 0;
 	int ppsirt_status = 0;
 	while (ppsirt_status != STATUS_FINISHED) {
 		ppsirt_zero_traj<<<1, n_ttl_traj>>>(traj);
-		ppsirt_update_traj<<<n_blocks, n_threads_per_block>>>(traj, part, d_ntraj);
+		ppsirt_update_traj<<<n_blocks, n_threads_per_block>>>(traj, part, d_ntraj, dev_dist_pt);
 		cudaDeviceSynchronize();
 		ppsirt<<<n_blocks, n_threads_per_block>>>(traj, part, d_npart, d_ntraj, dev_iter, d_st, d_lock, d_ocp, d_oci, d_tstable);
 		cudaDeviceSynchronize();

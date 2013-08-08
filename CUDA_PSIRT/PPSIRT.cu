@@ -125,7 +125,7 @@ __global__ void ppsirt_zero_traj(Trajectory* t)
 	t[tid].n_particulas_atual = 0;
 }
 
-__global__ void ppsirt_update_traj(Trajectory *t, Particle *p, int* n_traj) 
+__global__ void ppsirt_update_traj(Trajectory *t, Particle *p, int* n_traj, float* dist_pt) 
 {
 	int tid = blockIdx.x * blockDim.x + threadIdx.x, i=0;
 	__syncthreads();
@@ -138,8 +138,7 @@ __global__ void ppsirt_update_traj(Trajectory *t, Particle *p, int* n_traj)
 	{
 		if (p[tid].status == ALIVE | p[tid].status == CHECKED) 
 		{
-			float distance_point_line = distance(&p[tid].location,&t[i]);
-			if (distance_point_line<TRAJ_PART_THRESHOLD)
+			if ((dist_pt[tid] = distance(&p[tid].location,&t[i]))<TRAJ_PART_THRESHOLD)
 			{
 				atomicAdd(&(t[i].n_particulas_atual), 1);
 				p[tid].current_trajectories++;
