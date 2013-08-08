@@ -252,7 +252,7 @@ void cuda_psirt(PSIRT* host_psirt)
 
 	// (parametros de paralelização)
 	int n_elements = host_psirt->n_particles;
-	int n_threads_per_block = 32;
+	int n_threads_per_block = (n_elements > 256) ? 256 : 32;
 	int n_blocks = n_elements/n_threads_per_block;
 
 	cudaEvent_t start_1, start_paralel, stop_1, stop_paralel, start_cpu, stop_cpu;
