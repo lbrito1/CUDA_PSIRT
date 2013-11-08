@@ -31,76 +31,19 @@ PSIRT *dev_psirt;
 Projection**	dev_projections;
 Particle**		dev_particles;
 
-// ---------------------------
-// *** OPENGL ***
-// Desenhar configuracao (trajetorias)
-// ---------------------------
-void opengl_draw_configuration_lines(PSIRT* psirt)
-{
- glClear(GL_COLOR_BUFFER_BIT);
-
-
-
-  glBegin(GL_LINES);
-  int i, j;
-	for (i = 0; i < psirt->n_projections; i++)
-	{
-		for (j = 0; j < psirt->n_trajectories; j++)
-		{
-			Trajectory* t = &(psirt->trajectories[(i*psirt->n_projections)+j]);
-
-			Vector2D begin, end, d;
-			sum_void(&(t->source), &(t->direction), &begin);
-			d.x = t->direction.x;
-			d.y = t->direction.y;
-	
-			mult_constant_void(&d, -1);
-			sum_void(&(t->source), &d, &end);
-
-			glColor3f(1.0, 1.0, 1.0);
-			glVertex2f(begin.x, begin.y);
-			glVertex2f(end.x, end.y);
-			
-		}
-	}
-	glEnd();
-}
-
-// ---------------------------
-// *** OPENGL ***
-// Desenhar particulas
-// ---------------------------
-void opengl_draw_particles(PSIRT* psirt)
-{
-	int i=0;
-	glPointSize(7.0);
-	glBegin(GL_POINTS);
-	for (i = 0; i < psirt->n_particles; i++) {
-		if (psirt->particles[i].status != DEAD) {
-			glColor3f(1.0, 0.0, 0.0);
-			glVertex2f(psirt->particles[i].location.x, psirt->particles[i].location.y);
-		} else {
-			glColor3f(0.0, 1.0, 0.0);
-			glVertex2f(psirt->particles[i].location.x, psirt->particles[i].location.y);
-		}
-		//printf("\r\n%d: \t%f,%f",i,psirt->particles[i]->location->x, psirt->particles[i]->location->y);
-	}
-
-	glEnd();
-	glFlush();  // Render now
-}
+int color = 0;
 
 void opengl_draw()
 {
 	
+	glBegin(GL_POLYGON);
 
-	// Copia dev->host
-	cudaMemcpy(debug_host_psirt, dev_psirt, sizeof(PSIRT), cudaMemcpyDeviceToHost);
-	//printf("\r\nAAA->%d",debug_host_psirt->optim_max_iterations);
-	opengl_draw_configuration_lines(debug_host_psirt);
-	opengl_draw_particles(debug_host_psirt);
+	glVertex2f(0.2,0.2);
+	glVertex2f(0.6,0.6);
+	glVertex2f(0.6,0.2);
 
-	
+	glEnd();
+	glFlush();	
 }
 void update()
 {
@@ -114,6 +57,7 @@ void update()
 void keyboard_handler (unsigned char key, int x, int y)
 {
 	if (key == 27) exit(0);	//ESC = exit
+	else if (key == 27) color = color == 0?1:0;
 }
 
 
@@ -315,7 +259,7 @@ int main(int argc, char* argv[])
 
 		PSIRT* host_psirt = init_psirt();
 	
-	#ifdef DEBUG_OPENGL
+	
 		// 1. INICIALIZAR (HOST)
 		debug_host_psirt = init_psirt();
 
@@ -325,16 +269,6 @@ int main(int argc, char* argv[])
 
 		// 3. EXECUTAR / DESENHAR
 		init_opengl(argc, argv);
-	#endif
-
-	#ifndef DEBUG_OPENGL
-		cudaError_t cuda_status = cudaSetDevice(0);
-		if (cuda_status != cudaSuccess) printf("\r\n cuInit failed");
-
-		//prep_psirt(); // CUDA
-
-		test_psirt(host_psirt);
-	#endif
 
 	
 
