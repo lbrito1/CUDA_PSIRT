@@ -2,16 +2,9 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <CudaCompile Include="kernel.cu" />
-    <CudaCompile Include="Particle.cu" />
-    <CudaCompile Include="Trajectory.cu" />
-    <CudaCompile Include="Projection.cu" />
-    <CudaCompile Include="ProjectionController.cu" />
-    <CudaCompile Include="PSIRT.cu" />
-    <CudaCompile Include="Reconstruction.c" />
     <CudaCompile Include="CUDA_utils.cu" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Vector2D.cu" />
     <ClCompile Include="bmpfile.c" />
   </ItemGroup>
   <ItemGroup>

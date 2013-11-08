@@ -1,4 +1,3 @@
-#include "Reconstruction.c"
 #include "cuda.h"
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
@@ -6,6 +5,9 @@
 #include <windows.h>
 #include <time.h>
 #include <GL/glut.h>
+
+#define RES_X 320
+#define RES_Y RES_X
 
 #include <cuda_gl_interop.h>
 
