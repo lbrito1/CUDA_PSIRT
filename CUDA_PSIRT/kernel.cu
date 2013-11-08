@@ -5,9 +5,61 @@
 #include <windows.h>
 #include <time.h>
 #include <GL/glut.h>
+#include <math.h>
 
-#define RES_X 320
+#define RES_X 16
 #define RES_Y RES_X
+
+#define MAT_DIM RES_X
+
+#define MAT_SIZE MAT_DIM*MAT_DIM
+
+#define RES_FACTOR 10
+
+// Matriz MAT_DIM x MAT_DIM
+typedef int* MTraj;
+
+typedef MTraj* MTrajArray;
+
+int n_traj = 1;
+
+int belongs(float x, float y, float a, float b) { return (y==a*x + b) ? true : false; }
+
+int get_index(int x, int y) { return x*MAT_DIM+y <= MAT_SIZE ? x*MAT_DIM+y : -1; }
+
+void prep_MTraj(int *MT, float a, float b)
+{
+	// y = ax + b
+	for (int i=0; i<MAT_DIM; i++) 
+	{
+		for (int j=0; j<MAT_DIM; j++)
+		{
+			if (belongs(i,j,a,b)) MT[get_index(i,j)] = 0;
+			else 
+			{
+				float dx = abs(i-((j-b)/a));
+				float dy = abs(j-a*i-b);
+				MT[get_index(i,j)] = (int)sqrt(dx*dx + dy*dy);
+			}
+			printf(" %d", MT[get_index(i,j)]);
+		}
+
+		printf("\r\n");
+	}
+}
+
+
+void test()
+{
+	int *MT = (int*) malloc(sizeof(int) * MAT_SIZE);
+	float a = 1.0f;
+	float b = 0.0f;
+
+	prep_MTraj(MT, a, b);
+
+
+}
+
 
 #include <cuda_gl_interop.h>
 
@@ -92,6 +144,10 @@ int main(int argc, char* argv[])
 	cudaError_t cudaStatus;
 	GPUerrchk(cudaMalloc((void**)&dev_x, sizeof(float)));
 	
+
+
+	test();
+
 
 	// 3. EXECUTAR / DESENHAR
 	init_opengl(argc, argv);
