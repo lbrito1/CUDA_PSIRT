@@ -28,6 +28,8 @@ MTraj dev_MTraj;
 
 int n_traj = 1;
 
+int *host_MT_Sum;
+
 int belongs(double x, double y, double a, double b) { return (y==a*x + b) ? true : false; }
 
 inline int get_index(int x, int y) { return x*MAT_DIM+y <= MAT_SIZE ? x*MAT_DIM+y : -1; }
@@ -76,7 +78,7 @@ inline void get_eq_traj_director(double in_ang, double *out_a, double *out_b)
 int* prep_MT_from_config(int m, int n)
 {
 	int* root = (int*) malloc(sizeof(int)*m*n*MAT_SIZE);
-
+	
 	double ang = 180.0/m;
 
 	int d_traj = max(2, (int)((double)MAT_DIM/16.0f));	// distancia entre cada trajetória de uma projeção
@@ -102,6 +104,7 @@ void test()
 {
 	n_traj = 21;
 	host_MTraj = prep_MT_from_config(3,7);
+	host_MT_Sum = (int*) malloc(sizeof(int)*MAT_SIZE);
 
 	/*int* root = (int*) malloc(sizeof(int)*MAT_SIZE*2);
 
@@ -160,28 +163,79 @@ void opengl_draw()
 
 
 
-	glPointSize(1.0);
+	glPointSize(0.1);
 	glBegin(GL_POINTS);
 
 	glColor3f(1.0f,1.0f,1.0f);
 	glVertex2d(0.0,0.0);
 
+	int maxval = 0;
+
+	for (int i=0; i<MAT_SIZE; i++) host_MT_Sum[i] = 0;
+
 	for (int k=0; k<n_traj; k++) 
 	{
-
 		for (int i=0;i<MAT_DIM; i++) 
 		{
 			for (int j=0;j<MAT_DIM; j++) 
 			{
-				if ((host_MTraj[get_MT_idx(k,i,j)]) < .0001) 
+				int val = host_MTraj[get_MT_idx(k,i,j)];
+				//float val_norm = abs(1-(val/(double)MAT_DIM));
+				
+
+				int nval = host_MT_Sum[get_MT_idx(0,i,j)] += val;
+				maxval = nval>maxval? nval:maxval;
+
+				//glColor3f(val_norm,val_norm,val_norm);
+					/*
+
+				if (val < .0001) 
 				{
-					//printf("\r\n ij = %d, %d >>> coord= %f, %f",i,j,to_GL_coord(i),to_GL_coord(j));
+				//	glColor3f(1.0f,0.0f,0.0f);
+				//	glVertex2d(to_GL_coord(i), to_GL_coord(j));
+				}
+				else 
+				{
+					glColor3f(val_norm,val_norm,val_norm);
 					glVertex2d(to_GL_coord(i), to_GL_coord(j));
 				}
+				*/
+				
 
 			}
 		}
 	}
+
+
+	for (int i=0;i<MAT_DIM; i++) 
+	{
+		for (int j=0;j<MAT_DIM; j++) 
+		{
+			int val = host_MT_Sum[get_MT_idx(0,i,j)];
+			float val_norm = abs(1-(val/(double)maxval));
+			glColor3f(val_norm,val_norm,val_norm);
+			glVertex2d(to_GL_coord(i), to_GL_coord(j));
+		}
+	}
+
+		for (int k=0; k<n_traj; k++) 
+	{
+		for (int i=0;i<MAT_DIM; i++) 
+		{
+			for (int j=0;j<MAT_DIM; j++) 
+			{
+				int val = host_MTraj[get_MT_idx(k,i,j)];
+				if (val < .0001) 
+				{
+					glColor3f(1.0f,0.0f,0.0f);
+					glVertex2d(to_GL_coord(i), to_GL_coord(j));
+				}
+			}
+		}
+		}
+
+
+
 
 	glEnd();
 
