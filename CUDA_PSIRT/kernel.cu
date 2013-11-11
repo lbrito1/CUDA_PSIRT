@@ -7,6 +7,10 @@
 #include <GL/glut.h>
 #include <math.h>
 
+#define PI 3.14159265
+#define RAD(X) ((X*PI/180.0))
+
+
 #define RES_X 16
 #define RES_Y RES_X
 
@@ -25,39 +29,83 @@ int n_traj = 1;
 
 int belongs(float x, float y, float a, float b) { return (y==a*x + b) ? true : false; }
 
-int get_index(int x, int y) { return x*MAT_DIM+y <= MAT_SIZE ? x*MAT_DIM+y : -1; }
+inline int get_index(int x, int y) { return x*MAT_DIM+y <= MAT_SIZE ? x*MAT_DIM+y : -1; }
+inline int get_MT_offset(int i) { return i*MAT_SIZE; }
+inline int get_MT_idx(int ofs, int x, int y) { return get_MT_offset(ofs)+get_index(x,y); }
 
-void prep_MTraj(int *MT, float a, float b)
+void prep_MT_cells(int *MT, int offset, float a, float b)
 {
+	
+	printf("\r\nPreparando matriz id#%d, eq y=%f*x+%f",get_MT_offset(offset), a, b);
 	// y = ax + b
-	for (int i=0; i<MAT_DIM; i++) 
+	for (int j=0; j<MAT_DIM; j++) 
 	{
-		for (int j=0; j<MAT_DIM; j++)
+		for (int i=0; i<MAT_DIM; i++)
 		{
-			if (belongs(i,j,a,b)) MT[get_index(i,j)] = 0;
+			//printf("\r\nPreparando celula # %d,%d: ",i,j);
+
+			if (belongs(i,j,a,b)) MT[get_MT_idx(offset,i,j)] = 0;
 			else 
 			{
-				float dx = abs(i-((j-b)/a));
+				float dx = a>0.0001 ? abs(i-((j-b)/a)) : 0.0f; // casos perpendiculares (dist=0)
 				float dy = abs(j-a*i-b);
-				MT[get_index(i,j)] = (int)sqrt(dx*dx + dy*dy);
+
+				MT[get_MT_idx(offset,i,j)] = (int)sqrt(dx*dx + dy*dy);
 			}
-			printf(" %d", MT[get_index(i,j)]);
+			printf(" %d", MT[get_MT_idx(offset,i,j)]);
 		}
 
 		printf("\r\n");
 	}
 }
 
+// Primeira trajetória da projeção (intersecta todas as outras
+// diretoras das outras projs em x = MAT_DIM/2, y = MAT_DIM/2
+inline void get_eq_traj_director(float in_ang, float *out_a, float *out_b) 
+{
+	*out_a = tan(RAD(in_ang));
+	*out_b = (MAT_DIM*(1-*out_a))/2;
+}
+
+// config m x n, e.g. 3x7
+//in: config
+//out: array de arrays (matrizes) de inteiros 
+int* prep_MT_from_config(int m, int n)
+{
+	int* root = (int*) malloc(sizeof(int)*m*n*MAT_SIZE);
+
+	float ang = m/180.0f;
+
+	// Projections
+	for (int i=0, offset=0; i<m; i++) 
+	{
+		// Trajectories
+		for (int j=0; j<n; j++,offset++) 
+		{
+			float a, b;
+			get_eq_traj_director(ang*j, &a, &b);
+			prep_MT_cells(root, offset, a, b);
+		}
+	}
+
+	return root;
+}
+
+
 
 void test()
 {
-	int *MT = (int*) malloc(sizeof(int) * MAT_SIZE);
-	float a = 1.0f;
-	float b = 0.0f;
+	// prep_MT_from_config(3,7);
 
-	prep_MTraj(MT, a, b);
+	int* root = (int*) malloc(sizeof(int)*MAT_SIZE);
 
+	float ang = 0.0f;
 
+	float a, b;
+	
+	get_eq_traj_director(ang, &a, &b);
+
+	prep_MT_cells(root, 0, a, b);
 }
 
 
