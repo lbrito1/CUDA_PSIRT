@@ -34,7 +34,7 @@ inline int get_index(int x, int y) { return x*MAT_DIM+y <= MAT_SIZE ? x*MAT_DIM+
 inline int get_MT_offset(int i) { return i*MAT_SIZE; }
 inline int get_MT_idx(int ofs, int x, int y) { return get_MT_offset(ofs)+get_index(x,y); }
 
-inline double to_GL_coord(int x) { return (x/(double)MAT_DIM) - 1.0f; }
+inline double to_GL_coord(int x) { return (2*x/(double)MAT_DIM) - 1.0f; }
 
 void prep_MT_cells(int *MT, int offset, double a, double b)
 {
@@ -77,19 +77,19 @@ int* prep_MT_from_config(int m, int n)
 {
 	int* root = (int*) malloc(sizeof(int)*m*n*MAT_SIZE);
 
-	double ang = 180.0/3;
+	double ang = 180.0/m;
 
-	int d_traj = max(2, MAT_SIZE/8);	
+	int d_traj = max(2, (int)((double)MAT_DIM/16.0f));	// distancia entre cada trajetória de uma projeção
 
 	// Projections
 	for (int i=0, offset=0; i<m; i++) 
 	{
 		// Trajectories
-		for (int j=0; j<n; j++,offset++) 
+		for (int j=0, b_delta=d_traj; j<n; j++,offset++, b_delta+=d_traj) 
 		{
-			double a, b;
-			get_eq_traj_director(ang*j, &a, &b);
-			prep_MT_cells(root, offset, a, b);
+			double a, b, b_d = j%2==0?b_delta:-b_delta;
+			get_eq_traj_director(ang*i, &a, &b);
+			prep_MT_cells(root, offset, a, b + b_delta);
 		}
 	}
 
