@@ -87,9 +87,9 @@ int* prep_MT_from_config(int m, int n)
 		// Trajectories
 		for (int j=0, b_delta=d_traj; j<n; j++,offset++, b_delta+=d_traj) 
 		{
-			double a, b, b_d = j%2==0?b_delta:-b_delta;
+			double a, b, b_d = j==0?0: j%2==0?b_delta:-b_delta;
 			get_eq_traj_director(ang*i, &a, &b);
-			prep_MT_cells(root, offset, a, b + b_delta);
+			prep_MT_cells(root, offset, a, b + b_delta - (int)((double)MAT_DIM/4.0f));
 		}
 	}
 
