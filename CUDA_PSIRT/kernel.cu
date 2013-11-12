@@ -6,10 +6,21 @@
 #include <time.h>
 #include <GL/glut.h>
 #include <math.h>
+#include <cuda_gl_interop.h>
+
+inline void GPUassert(cudaError_t code, char *file, int line, bool abort=true)
+{
+   if (code != cudaSuccess)
+   {
+      fprintf(stderr,"GPUassert: %s %s %dn", cudaGetErrorString(code), file, line);
+      if (abort) exit(code);
+   }
+}
+#define GPUerrchk(ans) { GPUassert((ans), __FILE__, __LINE__); }
+
 
 #define PI 3.14159265
 #define RAD(X) ((X*PI/180.0))
-
 
 #define RES_X 160
 #define RES_Y RES_X
@@ -20,13 +31,25 @@
 
 #define RES_FACTOR 10
 
-// Matriz MAT_DIM x MAT_DIM
-typedef int* MTraj;
+#define FATOR_SEP 1
 
+struct hfloat2 { float x; float y; };
+
+
+typedef int* MTraj;	// Matriz MAT_DIM x MAT_DIM
 MTraj host_MTraj;
 MTraj dev_MTraj;
-
 int n_traj = 1;
+
+typedef int* MPart;	// Matriz MAT_DIM x MAT_DIM, cada elem>0 = 1 particula, id=1..MAX_INT
+MPart host_MPart;
+MPart dev_MPart;
+int n_part = 10;
+int *host_npart, *dev_npart;
+
+
+
+
 
 int *host_MT_Sum;
 
@@ -36,7 +59,26 @@ inline int get_index(int x, int y) { return x*MAT_DIM+y <= MAT_SIZE ? x*MAT_DIM+
 inline int get_MT_offset(int i) { return i*MAT_SIZE; }
 inline int get_MT_idx(int ofs, int x, int y) { return get_MT_offset(ofs)+get_index(x,y); }
 
+inline int fator_separacao_trajs(int ntraj) { return (int) ((double)MAT_DIM/((double)FATOR_SEP*(double)ntraj)); }
+
 inline double to_GL_coord(int x) { return (2*x/(double)MAT_DIM) - 1.0f; }
+
+inline float sum_angle(float angle, float sum) 
+{  
+	float x = angle+sum;
+	if (x>360.0f) return x-360.0f;
+	else if (x<0.0f) return 360.0f - abs(x);
+	else return x;
+}
+
+inline hfloat2 get_MT_vectors(float angle)
+{
+	hfloat2 vectors;
+	vectors.x = sum_angle(angle, 90.0f);
+	vectors.y = sum_angle(angle, -90.0f);
+	return vectors;
+
+}
 
 void prep_MT_cells(int *MT, int offset, double a, double b)
 {
@@ -75,13 +117,13 @@ inline void get_eq_traj_director(double in_ang, double *out_a, double *out_b)
 // config m x n, e.g. 3x7
 //in: config
 //out: array de arrays (matrizes) de inteiros 
-int* prep_MT_from_config(int m, int n)
+MTraj prep_MT_from_config(int m, int n)
 {
 	int* root = (int*) malloc(sizeof(int)*m*n*MAT_SIZE);
 	
 	double ang = 180.0/m;
 
-	int d_traj = max(2, (int)((double)MAT_DIM/16.0f));	// distancia entre cada trajetória de uma projeção
+	int d_traj = fator_separacao_trajs(n);	// distancia entre cada trajetória de uma projeção
 
 	// Projections
 	for (int i=0, offset=0; i<m; i++) 
@@ -89,22 +131,34 @@ int* prep_MT_from_config(int m, int n)
 		// Trajectories
 		for (int j=0, b_delta=d_traj; j<n; j++,offset++, b_delta+=d_traj) 
 		{
-			double a, b, b_d = j==0?0: j%2==0?b_delta:-b_delta;
+			double a, b;
 			get_eq_traj_director(ang*i, &a, &b);
-			prep_MT_cells(root, offset, a, b + b_delta - (int)((double)MAT_DIM/4.0f));
+			prep_MT_cells(root, offset, a, b + b_delta - (int)((double)MAT_DIM/2));
 		}
-	}
+	} 
 
 	return root;
 }
 
-
+MTraj CUDA_PREP_COPY_MT(MTraj MT_src, int m, int n)
+{
+	MTraj dev_root;
+	int size = m*n*MAT_SIZE;
+	GPUerrchk(cudaMalloc((void**)&dev_root, sizeof(int)*size));
+	GPUerrchk(cudaMemcpy(dev_root, MT_src, sizeof(int)*size, cudaMemcpyHostToDevice));
+	return dev_root;
+}
 
 void test()
 {
-	n_traj = 21;
-	host_MTraj = prep_MT_from_config(3,7);
+	int m, n;
+	m = 3;
+	n = 7;
+
+	n_traj = m*n;
+	host_MTraj = prep_MT_from_config(m,n);
 	host_MT_Sum = (int*) malloc(sizeof(int)*MAT_SIZE);
+	dev_MTraj = CUDA_PREP_COPY_MT(host_MTraj, m,n);
 
 	/*int* root = (int*) malloc(sizeof(int)*MAT_SIZE*2);
 
@@ -120,17 +174,6 @@ void test()
 }
 
 
-#include <cuda_gl_interop.h>
-
-inline void GPUassert(cudaError_t code, char *file, int line, bool abort=true)
-{
-   if (code != cudaSuccess)
-   {
-      fprintf(stderr,"GPUassert: %s %s %dn", cudaGetErrorString(code), file, line);
-      if (abort) exit(code);
-   }
-}
-#define GPUerrchk(ans) { GPUassert((ans), __FILE__, __LINE__); }
 
 GLuint positionsVBO;
 struct cudaGraphicsResource *positionsVBO_CUDA;
@@ -163,7 +206,7 @@ void opengl_draw()
 
 
 
-	glPointSize(0.1);
+	glPointSize(2.0);
 	glBegin(GL_POINTS);
 
 	glColor3f(1.0f,1.0f,1.0f);
