@@ -34,6 +34,8 @@ inline void GPUassert(cudaError_t code, char *file, int line, bool abort=true)
 
 #define FATOR_SEP 1
 
+#define FATOR_PROX 0.15
+
 struct hfloat2 { float x; float y; };
 
 
@@ -41,6 +43,7 @@ typedef int* MTraj;	// Matriz MAT_DIM x MAT_DIM
 MTraj host_MTraj;
 MTraj dev_MTraj;
 int n_traj = 1;
+int n_proj;
 
 typedef int* MPart;	// Matriz MAT_DIM x MAT_DIM, cada elem>0 = 1 particula, id=1..MAX_INT
 MPart host_MPart;
@@ -48,19 +51,34 @@ MPart dev_MPart;
 int n_part = 10;
 int *host_npart, *dev_npart;
 
+typedef float2* MVector; // Matriz MAT_DIM x MAT_DIM, cada elem = vetor unidade força naquele ponto	
 
+int* host_n_part_stable;
+int* dev_n_part_stable;
+int* host_n_part_current;
+int* dev_n_part_current;
 
 
 
 int *host_MT_Sum;
 
-int belongs(double x, double y, double a, double b) { return (y==a*x + b) ? true : false; }
+inline int belongs(double x, double y, double a, double b) { return (y==a*x + b) ? true : false; }
 
 inline int get_index(int x, int y) { return x*MAT_DIM+y <= MAT_SIZE ? x*MAT_DIM+y : -1; }
-inline int get_MT_offset(int i) { return i*MAT_SIZE; }
-inline int get_MT_idx(int ofs, int x, int y) { return get_MT_offset(ofs)+get_index(x,y); }
+__host__ __device__ inline int get_MT_offset(int i) { return i*MAT_SIZE; }
+__host__ __device__ inline int M_idx(int ofs, int x, int y) { return get_MT_offset(ofs)+get_index(x,y); }
 
-inline int fator_separacao_trajs(int ntraj) { return (int) ((double)MAT_DIM/((double)FATOR_SEP*(double)ntraj)); }
+inline void rotate_vector(float2 v, float ang) 
+{
+	float nvx = v.x*cos(ang) - v.y*sin(ang);
+	float nvy = v.x*sin(ang) - v.y*cos(ang);
+	v.x = nvx; v.y = nvy;
+}
+
+inline int fator_separacao_trajs(int ntraj_per_proj) { return (int) ((double)MAT_DIM/((double)FATOR_SEP*(double)ntraj_per_proj)); }
+
+//retorna se a partícula pertence à trajetória distante dist da partícula. (saída: distancia se pertence ou 0 para desconsiderar)
+inline int part_is_in_traj(int dist, int ntraj_per_proj) { return dist <= (int) (ntraj_per_proj*((double)FATOR_PROX)) ? dist : 0 ;  };
 
 inline double to_GL_coord(int x) { return (2*x/(double)MAT_DIM) - 1.0f; }
 
@@ -78,8 +96,49 @@ inline hfloat2 get_MT_vectors(float angle)
 	vectors.x = sum_angle(angle, 90.0f);
 	vectors.y = sum_angle(angle, -90.0f);
 	return vectors;
+}
+
+void APSIRT_main_loop()
+{
 
 }
+
+__global__ void CUDA_APSIRT(MTraj MT, MPart MP, MVector MV, int* np_stb, int* np_cur, int* traj_stb, int cfg_nproj, int cfg_ntraj)
+{	
+	/*// 0. Setup CUDA, zerar ntraj estáveis
+	int tid_x = blockIdx.x * blockDim.x + threadIdx.x;	
+	int tid_y = blockIdx.y * blockDim.y + threadIdx.y;	
+	int tid_z = blockIdx.z * blockDim.z + threadIdx.z;	
+
+	*traj_stb = 0;
+
+	// 1. Calcular força resultante
+	int dist =  MT[M_idx(tid_z, tid_x, tid_y)];
+	int deltapart = np_stb[tid_z]-np_cur[tid_z];
+
+	double resultant = deltapart/dist*dist;
+
+	int fr_x = (int) (MV[tid_z].x * resultant);
+	int fr_y = (int) (MV[tid_z].y * resultant);
+
+	// 2. Atualizar posição da partícula					// PERIGO CONCORRENCIA/ USAR SEC ATOMICA
+	if (MP[M_idx(0,tid_x,tid_y)] > 0) 
+	{
+		atomicDec((int*) &MP[M_idx(0,tid_x,tid_y)], 0);
+		atomicInc((int*) &MP[M_idx(0,fr_x, fr_y) ], 0);
+	}
+	
+	// 3. Atualizar trajetórias
+	int qtd_parts = MP[M_idx(0, tid_x, tid_y)];
+	int dist = MT[M_idx(tid_z, tid_x, tid_y)];
+
+	if (qtd_parts>0 && part_is_in_traj(dist, cfg_ntraj)) atomicAdd(&np_cur[tid_z], qtd_parts);
+
+	// 4. Checar convergência
+	if (*np_cur >= *np_stb) atomicInc(traj_stb,0);*/
+}
+
+
 
 void prep_MT_cells(int *MT, int offset, double a, double b)
 {
@@ -92,15 +151,15 @@ void prep_MT_cells(int *MT, int offset, double a, double b)
 		{
 			//printf("\r\nPreparando celula # %d,%d: ",i,j);
 
-			if (belongs(i,j,a,b)) MT[get_MT_idx(offset,i,j)] = 0;
+			if (belongs(i,j,a,b)) MT[M_idx(offset,i,j)] = 0;
 			else 
 			{
 				double dx = a>0.0001 ? abs(i-((j-b)/a)) : 0.0f; // casos perpendiculares (dist=0)
 				double dy = abs(j-a*i-b);
 
-				MT[get_MT_idx(offset,i,j)] = (int)sqrt(dx*dx + dy*dy);
+				MT[M_idx(offset,i,j)] = (int)sqrt(dx*dx + dy*dy);
 			}
-		//	printf(" %d", MT[get_MT_idx(offset,i,j)]);
+		//	printf(" %d", MT[M_idx(offset,i,j)]);
 		}
 
 		//printf("\r\n");
@@ -115,17 +174,38 @@ inline void get_eq_traj_director(double in_ang, double *out_a, double *out_b)
 	*out_b = (MAT_DIM*(1-*out_a))/2;
 }
 
+void prep_MV(MVector MV, int traj_id, double ang, double a, double b)
+{
+	for (int x=0; x<MAT_DIM; x++) 
+	{
+		double yreta = a*x+b;
+
+		for (int y=0; y<MAT_DIM; y++) 
+		{
+			ang = (y<yreta) ? sum_angle(ang, 90.0f) : sum_angle(ang, -90.0f) ;
+			float2 vec;
+			vec.x = 1.0f;
+			vec.y = 1.0f;
+			rotate_vector(vec, ang);
+
+			MV[M_idx(traj_id, x, y)].x = vec.x;
+			MV[M_idx(traj_id, x, y)].y = vec.y;
+		}
+	}
+}
+
 // config m x n, e.g. 3x7
 //in: config
 //out: array de arrays (matrizes) de inteiros 
 MTraj prep_MT_from_config(int m, int n)
 {
 	int* root = (int*) malloc(sizeof(int)*m*n*MAT_SIZE);
-	
+	MVector MV = (MVector) malloc(sizeof(float2) * MAT_SIZE * m * n);
+
 	double ang = 180.0/m;
 
 	int d_traj = fator_separacao_trajs(n);	// distancia entre cada trajetória de uma projeção
-
+	printf("\r\nSeparacao entre trajetorias = %d \r\n",d_traj);
 	// Projections
 	for (int i=0, offset=0; i<m; i++) 
 	{
@@ -135,6 +215,8 @@ MTraj prep_MT_from_config(int m, int n)
 			double a, b;
 			get_eq_traj_director(ang*i, &a, &b);
 			prep_MT_cells(root, offset, a, b + b_delta - (int)((double)MAT_DIM/2));
+				
+			prep_MV(MV, offset, ang*i, a, b);
 		}
 	} 
 
@@ -147,7 +229,7 @@ MPart prep_MP(int npart)
 	srand(time(NULL));
 
 	for (int i=0; i<MAT_SIZE; i++) MP[i] = 0;	// inicializar com 0 particula/celula
-	for (int i=0; i<npart; i++) MP[get_MT_idx(0, rand()%MAT_DIM, rand()%MAT_DIM)]++; 
+	for (int i=0; i<npart; i++) MP[M_idx(0, rand()%MAT_DIM, rand()%MAT_DIM)]++; 
 	
 	return MP;
 }
@@ -247,11 +329,11 @@ void opengl_draw()
 		{
 			for (int j=0;j<MAT_DIM; j++) 
 			{
-				int val = host_MTraj[get_MT_idx(k,i,j)];
+				int val = host_MTraj[M_idx(k,i,j)];
 				//float val_norm = abs(1-(val/(double)MAT_DIM));
 				
 
-				int nval = host_MT_Sum[get_MT_idx(0,i,j)] += val;
+				int nval = host_MT_Sum[M_idx(0,i,j)] += val;
 				maxval = nval>maxval? nval:maxval;
 
 				
@@ -265,7 +347,7 @@ void opengl_draw()
 	{
 		for (int j=0;j<MAT_DIM; j++) 
 		{
-			int val = host_MT_Sum[get_MT_idx(0,i,j)];
+			int val = host_MT_Sum[M_idx(0,i,j)];
 			float val_norm = abs(1-(val/(double)maxval));
 			glColor3f(val_norm,val_norm,val_norm);
 			glVertex2d(to_GL_coord(i), to_GL_coord(j));
@@ -278,7 +360,7 @@ void opengl_draw()
 		{
 			for (int j=0;j<MAT_DIM; j++) 
 			{
-				int val = host_MTraj[get_MT_idx(k,i,j)];
+				int val = host_MTraj[M_idx(k,i,j)];
 				if (val == 0) 
 				{
 					glColor3f(1.0f,0.0f,0.0f);
@@ -295,7 +377,7 @@ void opengl_draw()
 		{
 			for (int j=0;j<MAT_DIM; j++) 
 			{
-				int val = host_MPart[get_MT_idx(0,i,j)];
+				int val = host_MPart[M_idx(0,i,j)];
 				if (val > 0) 
 				{
 					glColor3f(0.0f,1.0f,0.0f);
