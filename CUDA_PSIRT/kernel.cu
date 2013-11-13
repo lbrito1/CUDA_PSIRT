@@ -36,6 +36,10 @@ inline void GPUassert(cudaError_t code, char *file, int line, bool abort=true)
 
 #define FATOR_PROX 0.15
 
+
+int dbg_showvec = 0;
+int dbg_trajid = 0;
+
 struct hfloat2 { float x; float y; };
 
 
@@ -52,12 +56,15 @@ int n_part = 10;
 int *host_npart, *dev_npart;
 
 typedef float2* MVector; // Matriz MAT_DIM x MAT_DIM, cada elem = vetor unidade força naquele ponto	
+MVector host_MV;
+MVector dev_MV;
 
 int* host_n_part_stable;
 int* dev_n_part_stable;
 int* host_n_part_current;
 int* dev_n_part_current;
 
+int host_ntraj, host_nproj;
 
 
 int *host_MT_Sum;
@@ -68,11 +75,12 @@ inline int get_index(int x, int y) { return x*MAT_DIM+y <= MAT_SIZE ? x*MAT_DIM+
 __host__ __device__ inline int get_MT_offset(int i) { return i*MAT_SIZE; }
 __host__ __device__ inline int M_idx(int ofs, int x, int y) { return get_MT_offset(ofs)+get_index(x,y); }
 
-inline void rotate_vector(float2 v, float ang) 
+inline float2 rotate_vector(float2 v, float ang) 
 {
-	float nvx = v.x*cos(ang) - v.y*sin(ang);
-	float nvy = v.x*sin(ang) - v.y*cos(ang);
-	v.x = nvx; v.y = nvy;
+	float2 nv;
+	nv.x = v.x*cos(ang) - v.y*sin(ang);
+	nv.y = v.x*sin(ang) - v.y*cos(ang);
+	return nv;
 }
 
 inline int fator_separacao_trajs(int ntraj_per_proj) { return (int) ((double)MAT_DIM/((double)FATOR_SEP*(double)ntraj_per_proj)); }
@@ -174,7 +182,7 @@ inline void get_eq_traj_director(double in_ang, double *out_a, double *out_b)
 	*out_b = (MAT_DIM*(1-*out_a))/2;
 }
 
-void prep_MV(MVector MV, int traj_id, double ang, double a, double b)
+void prep_MV(MVector MV, int traj_id, double proj_ang, double a, double b)
 {
 	for (int x=0; x<MAT_DIM; x++) 
 	{
@@ -182,14 +190,14 @@ void prep_MV(MVector MV, int traj_id, double ang, double a, double b)
 
 		for (int y=0; y<MAT_DIM; y++) 
 		{
-			ang = (y<yreta) ? sum_angle(ang, 90.0f) : sum_angle(ang, -90.0f) ;
-			float2 vec;
+			double ang = (y<yreta) ? sum_angle(proj_ang, -90.0f) : sum_angle(proj_ang, 90.0f) ;
+			float2 vec, nv;
 			vec.x = 1.0f;
 			vec.y = 1.0f;
-			rotate_vector(vec, ang);
+			nv = rotate_vector(vec, ang);
 
-			MV[M_idx(traj_id, x, y)].x = vec.x;
-			MV[M_idx(traj_id, x, y)].y = vec.y;
+			MV[M_idx(traj_id, x, y)].x = nv.x;
+			MV[M_idx(traj_id, x, y)].y = nv.y;
 		}
 	}
 }
@@ -197,10 +205,10 @@ void prep_MV(MVector MV, int traj_id, double ang, double a, double b)
 // config m x n, e.g. 3x7
 //in: config
 //out: array de arrays (matrizes) de inteiros 
-MTraj prep_MT_from_config(int m, int n)
+MTraj prep_MT_from_config(int m, int n, MVector MV)
 {
 	int* root = (int*) malloc(sizeof(int)*m*n*MAT_SIZE);
-	MVector MV = (MVector) malloc(sizeof(float2) * MAT_SIZE * m * n);
+	host_MV = MV = (MVector) malloc(sizeof(float2) * MAT_SIZE * m * n);
 
 	double ang = 180.0/m;
 
@@ -212,11 +220,12 @@ MTraj prep_MT_from_config(int m, int n)
 		// Trajectories
 		for (int j=0, b_delta=d_traj; j<n; j++,offset++, b_delta+=d_traj) 
 		{
-			double a, b;
+			double a, b, n_b;
 			get_eq_traj_director(ang*i, &a, &b);
-			prep_MT_cells(root, offset, a, b + b_delta - (int)((double)MAT_DIM/2));
+			n_b = b + b_delta - (int)((double)MAT_DIM/2);
+			prep_MT_cells(root, offset, a, n_b);
 				
-			prep_MV(MV, offset, ang*i, a, b);
+			prep_MV(MV, offset, ang*i, a, n_b);
 		}
 	} 
 
@@ -256,11 +265,13 @@ void test()
 	int m, n;
 	m = 3;
 	n = 7;
-	
+	host_ntraj = n;
+	host_nproj = m;
+
 	n_part = 64;
 
 	n_traj = m*n;
-	host_MTraj = prep_MT_from_config(m,n);
+	host_MTraj = prep_MT_from_config(m,n, host_MV);
 	host_MT_Sum = (int*) malloc(sizeof(int)*MAT_SIZE);
 	dev_MTraj = CUDA_PREP_COPY_MT(host_MTraj, m,n);
 
@@ -387,6 +398,18 @@ void opengl_draw()
 			}
 		}
 
+	// DESENHAR CAMPO VET
+	if (dbg_showvec)
+	for (int i=0;i<MAT_DIM; i++) 
+	{
+		for (int j=0;j<MAT_DIM; j++) 
+		{
+			float2 vec = host_MV[M_idx(dbg_trajid, i, j)];
+			glColor3f(vec.x, vec.y, 0.0f);
+			glVertex2d(to_GL_coord(i), to_GL_coord(j));
+		}
+	}
+
 
 
 	glEnd();
@@ -410,7 +433,8 @@ void update()
 void keyboard_handler (unsigned char key, int x, int y)
 {
 	if (key == 27) exit(0);	//ESC = exit
-
+	else if (key == 'v') dbg_showvec = dbg_showvec==0? 1 : 0;
+	else if (key == '+') { dbg_trajid = (dbg_trajid+1) < (host_ntraj*host_nproj) ? dbg_trajid+1 : 0 ; printf("\r\nTraj atual = %d",dbg_trajid); }
 }
 
 
