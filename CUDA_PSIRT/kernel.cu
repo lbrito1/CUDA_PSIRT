@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <windows.h>
 #include <time.h>
+#include <stdlib.h>
 #include <GL/glut.h>
 #include <math.h>
 #include <cuda_gl_interop.h>
@@ -140,6 +141,17 @@ MTraj prep_MT_from_config(int m, int n)
 	return root;
 }
 
+MPart prep_MP(int npart)
+{
+	MPart MP = (MPart) malloc(sizeof(int)*MAT_SIZE);
+	srand(time(NULL));
+
+	for (int i=0; i<MAT_SIZE; i++) MP[i] = 0;	// inicializar com 0 particula/celula
+	for (int i=0; i<npart; i++) MP[get_MT_idx(0, rand()%MAT_DIM, rand()%MAT_DIM)]++; 
+	
+	return MP;
+}
+
 MTraj CUDA_PREP_COPY_MT(MTraj MT_src, int m, int n)
 {
 	MTraj dev_root;
@@ -149,16 +161,29 @@ MTraj CUDA_PREP_COPY_MT(MTraj MT_src, int m, int n)
 	return dev_root;
 }
 
+MPart CUDA_PREP_COPY_MP(MPart MP_src)
+{
+	MPart dev_p;
+	GPUerrchk(cudaMalloc((void**)&dev_p, sizeof(int)*MAT_SIZE));
+	GPUerrchk(cudaMemcpy(dev_p, MP_src, sizeof(int)*MAT_SIZE, cudaMemcpyHostToDevice));
+	return dev_p;
+}
+
 void test()
 {
 	int m, n;
 	m = 3;
 	n = 7;
+	
+	n_part = 64;
 
 	n_traj = m*n;
 	host_MTraj = prep_MT_from_config(m,n);
 	host_MT_Sum = (int*) malloc(sizeof(int)*MAT_SIZE);
 	dev_MTraj = CUDA_PREP_COPY_MT(host_MTraj, m,n);
+
+	host_MPart = prep_MP(n_part);
+	dev_MPart = CUDA_PREP_COPY_MP(host_MPart);
 
 	/*int* root = (int*) malloc(sizeof(int)*MAT_SIZE*2);
 
@@ -229,20 +254,6 @@ void opengl_draw()
 				int nval = host_MT_Sum[get_MT_idx(0,i,j)] += val;
 				maxval = nval>maxval? nval:maxval;
 
-				//glColor3f(val_norm,val_norm,val_norm);
-					/*
-
-				if (val < .0001) 
-				{
-				//	glColor3f(1.0f,0.0f,0.0f);
-				//	glVertex2d(to_GL_coord(i), to_GL_coord(j));
-				}
-				else 
-				{
-					glColor3f(val_norm,val_norm,val_norm);
-					glVertex2d(to_GL_coord(i), to_GL_coord(j));
-				}
-				*/
 				
 
 			}
@@ -261,22 +272,38 @@ void opengl_draw()
 		}
 	}
 
-		for (int k=0; k<n_traj; k++) 
+	for (int k=0; k<n_traj; k++) 
 	{
 		for (int i=0;i<MAT_DIM; i++) 
 		{
 			for (int j=0;j<MAT_DIM; j++) 
 			{
 				int val = host_MTraj[get_MT_idx(k,i,j)];
-				if (val < .0001) 
+				if (val == 0) 
 				{
 					glColor3f(1.0f,0.0f,0.0f);
 					glVertex2d(to_GL_coord(i), to_GL_coord(j));
 				}
 			}
 		}
-		}
+	}
 
+
+	// DESENHAR PARTICULAS (SOBREPOE TRAJ)
+
+	for (int i=0;i<MAT_DIM; i++) 
+		{
+			for (int j=0;j<MAT_DIM; j++) 
+			{
+				int val = host_MPart[get_MT_idx(0,i,j)];
+				if (val > 0) 
+				{
+					glColor3f(0.0f,1.0f,0.0f);
+					glVertex2d(to_GL_coord(i), to_GL_coord(j));
+
+				}
+			}
+		}
 
 
 
