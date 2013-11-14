@@ -53,19 +53,10 @@ typedef int* MPart;	// Matriz MAT_DIM x MAT_DIM, cada elem>0 = 1 particula, id=1
 MPart host_MPart;
 MPart dev_MPart;
 int n_part = 10;
-int *host_npart, *dev_npart;
 
 typedef float2* MVector; // Matriz MAT_DIM x MAT_DIM, cada elem = vetor unidade força naquele ponto	
 MVector host_MV;
 MVector dev_MV;
-
-int* host_n_part_stable;
-int* dev_n_part_stable;
-int* host_n_part_current;
-int* dev_n_part_current;
-
-int host_ntraj, host_nproj;
-
 
 int *host_MT_Sum;
 
@@ -106,20 +97,18 @@ inline hfloat2 get_MT_vectors(float angle)
 	return vectors;
 }
 
-void APSIRT_main_loop()
-{
 
-}
 
-__global__ void CUDA_APSIRT(MTraj MT, MPart MP, MVector MV, int* np_stb, int* np_cur, int* traj_stb, int cfg_nproj, int cfg_ntraj)
+
+__global__ void CUDA_APSIRT(MTraj MT, MPart MP, MVector MV, int* np_stb, int* np_cur, int* traj_stb, int* cfg_nproj, int* cfg_ntraj, int* dev_npart)
 {	
-	/*// 0. Setup CUDA, zerar ntraj estáveis
+	// 0. Setup CUDA, zerar ntraj estáveis
 	int tid_x = blockIdx.x * blockDim.x + threadIdx.x;	
 	int tid_y = blockIdx.y * blockDim.y + threadIdx.y;	
 	int tid_z = blockIdx.z * blockDim.z + threadIdx.z;	
 
 	*traj_stb = 0;
-
+	/*
 	// 1. Calcular força resultante
 	int dist =  MT[M_idx(tid_z, tid_x, tid_y)];
 	int deltapart = np_stb[tid_z]-np_cur[tid_z];
@@ -144,6 +133,16 @@ __global__ void CUDA_APSIRT(MTraj MT, MPart MP, MVector MV, int* np_stb, int* np
 
 	// 4. Checar convergência
 	if (*np_cur >= *np_stb) atomicInc(traj_stb,0);*/
+}
+
+void APSIRT_main_loop(MTraj dev_MT, MPart dev_MP, MVector dev_MV, int* dev_np_stb, int* dev_np_cur, int* dev_traj_stb, int* dev_nproj, int* dev_ntraj, int* dev_npart, int host_nttltraj)
+{
+	int blocks = ceilf( (int)(MAT_DIM) / 32.0f );
+	dim3 gridDim( blocks, blocks, 1 );
+	size_t threads = ceilf( (int)(MAT_DIM) / (float)blocks );
+	dim3 blockDim( threads, threads, host_nttltraj );
+ 
+	CUDA_APSIRT<<< gridDim, blockDim >>>( dev_MT, dev_MP, dev_MV, dev_np_stb, dev_np_cur, dev_traj_stb, dev_nproj, dev_ntraj, dev_npart );
 }
 
 
@@ -252,6 +251,15 @@ MTraj CUDA_PREP_COPY_MT(MTraj MT_src, int m, int n)
 	return dev_root;
 }
 
+MVector CUDA_PREP_COPY_MV(MVector MV_src, int m, int n)
+{
+	MVector dev_MV;
+	int size = m*n*MAT_SIZE;
+	GPUerrchk(cudaMalloc((void**)&dev_MV, sizeof(float2)*size));
+	GPUerrchk(cudaMemcpy(dev_MV, MV_src, sizeof(float2)*size, cudaMemcpyHostToDevice));
+	return dev_MV;
+}
+
 MPart CUDA_PREP_COPY_MP(MPart MP_src)
 {
 	MPart dev_p;
@@ -260,23 +268,63 @@ MPart CUDA_PREP_COPY_MP(MPart MP_src)
 	return dev_p;
 }
 
+int* prep_intarray(int length, int val)
+{
+	int* a = (int*) malloc(sizeof(int)*length);
+	for (int i=0;i<length;i++) a[i] = val;
+	return a;
+}
+
+int* CUDA_PREP_COPY_intarray(int* src, int length)
+{
+	int* c;
+	GPUerrchk(cudaMalloc((void**)&c, sizeof(int)*length));
+	GPUerrchk(cudaMemcpy(c, src, sizeof(int)*length, cudaMemcpyHostToDevice));
+	return c;
+}
+
+int *host_npart, *dev_npart;
+int *host_ntraj, *host_nproj, *host_nttltraj, *dev_ntraj, *dev_nproj, *dev_nttltraj;
+int *host_np_cur, *host_np_stb, *host_traj_stb, *dev_np_cur, *dev_np_stb, *dev_traj_stb;
+
 void test()
 {
 	int m, n;
 	m = 3;
 	n = 7;
-	host_ntraj = n;
-	host_nproj = m;
-
 	n_part = 64;
+
+	host_npart = prep_intarray(1, n_part);
+	host_ntraj = prep_intarray(1, m);
+	host_nproj = prep_intarray(1, n);
+	host_nttltraj = prep_intarray(1, (*host_ntraj)*(*host_nproj));
+	host_np_cur = prep_intarray(*host_nttltraj, 0);
+	host_np_stb = prep_intarray(*host_nttltraj, 0);
+	host_traj_stb = prep_intarray(1, 0);
+	
+	dev_npart =		CUDA_PREP_COPY_intarray(host_npart, 1);
+	dev_ntraj =		CUDA_PREP_COPY_intarray(host_ntraj, 1);
+	dev_nproj =		CUDA_PREP_COPY_intarray(host_nproj, 1);
+	dev_nttltraj =	CUDA_PREP_COPY_intarray(host_nttltraj, 1);
+	dev_np_cur =	CUDA_PREP_COPY_intarray(host_np_cur, *host_nttltraj);
+	dev_np_stb =	CUDA_PREP_COPY_intarray(host_np_cur, *host_nttltraj);
+	dev_traj_stb =	CUDA_PREP_COPY_intarray(host_traj_stb, 1);
+	
 
 	n_traj = m*n;
 	host_MTraj = prep_MT_from_config(m,n, host_MV);
 	host_MT_Sum = (int*) malloc(sizeof(int)*MAT_SIZE);
 	dev_MTraj = CUDA_PREP_COPY_MT(host_MTraj, m,n);
+	dev_MV = CUDA_PREP_COPY_MV(host_MV, m, n);
 
 	host_MPart = prep_MP(n_part);
 	dev_MPart = CUDA_PREP_COPY_MP(host_MPart);
+
+	
+
+
+	APSIRT_main_loop(dev_MTraj, dev_MPart, dev_MV, dev_np_stb, dev_np_cur, dev_traj_stb, dev_nproj, dev_ntraj, dev_npart, *host_nttltraj);
+
 
 	/*int* root = (int*) malloc(sizeof(int)*MAT_SIZE*2);
 
@@ -434,7 +482,7 @@ void keyboard_handler (unsigned char key, int x, int y)
 {
 	if (key == 27) exit(0);	//ESC = exit
 	else if (key == 'v') dbg_showvec = dbg_showvec==0? 1 : 0;
-	else if (key == '+') { dbg_trajid = (dbg_trajid+1) < (host_ntraj*host_nproj) ? dbg_trajid+1 : 0 ; printf("\r\nTraj atual = %d",dbg_trajid); }
+	else if (key == '+') { dbg_trajid = (dbg_trajid+1) < ((*host_ntraj)*(*host_nproj)) ? dbg_trajid+1 : 0 ; printf("\r\nTraj atual = %d",dbg_trajid); }
 }
 
 
