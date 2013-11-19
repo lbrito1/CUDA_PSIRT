@@ -39,6 +39,7 @@ inline void GPUassert(cudaError_t code, char *file, int line, bool abort=true)
 
 int dbg_showvec = 0;
 int dbg_trajid = 0;
+int dbg_CUDA_active = 0;
 
 struct hfloat2 { float x; float y; };
 
@@ -97,20 +98,24 @@ inline hfloat2 get_MT_vectors(float angle)
 	return vectors;
 }
 
+double *dev_x;
+double *host_x;
 
 
 
 __global__ void CUDA_APSIRT(MTraj MT, MPart MP, MVector MV, int* np_stb, int* np_cur, int* traj_stb, int* cfg_nproj, int* cfg_ntraj, int* dev_npart)
-{	
+{
 	// 0. Setup CUDA, zerar ntraj estáveis
 	int tid_x = blockIdx.x * blockDim.x + threadIdx.x;	
 	int tid_y = blockIdx.y * blockDim.y + threadIdx.y;	
-	int tid_z = blockIdx.z * blockDim.z + threadIdx.z;	
+	int tid_z = blockIdx.z;
 
-	*traj_stb = 0;
-	/*
+	//*traj_stb = 0;
+	///!!!!!!!!!!
+	*traj_stb = 2;
+	if(*traj_stb>0)printf("!!!!!!!!!!!!!!!");
 	// 1. Calcular força resultante
-	int dist =  MT[M_idx(tid_z, tid_x, tid_y)];
+	/*int dist =  MT[M_idx(tid_z, tid_x, tid_y)];
 	int deltapart = np_stb[tid_z]-np_cur[tid_z];
 
 	double resultant = deltapart/dist*dist;
@@ -121,12 +126,12 @@ __global__ void CUDA_APSIRT(MTraj MT, MPart MP, MVector MV, int* np_stb, int* np
 	// 2. Atualizar posição da partícula					// PERIGO CONCORRENCIA/ USAR SEC ATOMICA
 	if (MP[M_idx(0,tid_x,tid_y)] > 0) 
 	{
-		atomicDec((int*) &MP[M_idx(0,tid_x,tid_y)], 0);
-		atomicInc((int*) &MP[M_idx(0,fr_x, fr_y) ], 0);
-	}
+		atomicDec((unsigned int*) &MP[M_idx(0,tid_x,tid_y)], 0);
+		atomicInc((unsigned int*) &MP[M_idx(0,fr_x, fr_y) ], 0);
+	}*/
 	
 	// 3. Atualizar trajetórias
-	int qtd_parts = MP[M_idx(0, tid_x, tid_y)];
+	/*int qtd_parts = MP[M_idx(0, tid_x, tid_y)];
 	int dist = MT[M_idx(tid_z, tid_x, tid_y)];
 
 	if (qtd_parts>0 && part_is_in_traj(dist, cfg_ntraj)) atomicAdd(&np_cur[tid_z], qtd_parts);
@@ -135,15 +140,43 @@ __global__ void CUDA_APSIRT(MTraj MT, MPart MP, MVector MV, int* np_stb, int* np
 	if (*np_cur >= *np_stb) atomicInc(traj_stb,0);*/
 }
 
-void APSIRT_main_loop(MTraj dev_MT, MPart dev_MP, MVector dev_MV, int* dev_np_stb, int* dev_np_cur, int* dev_traj_stb, int* dev_nproj, int* dev_ntraj, int* dev_npart, int host_nttltraj)
+
+inline void CUDA_COPY_int(int* src, int* dst, int length, cudaMemcpyKind kind) 
 {
-	int blocks = ceilf( (int)(MAT_DIM) / 32.0f );
-	dim3 gridDim( blocks, blocks, 1 );
-	size_t threads = ceilf( (int)(MAT_DIM) / (float)blocks );
-	dim3 blockDim( threads, threads, host_nttltraj );
- 
-	CUDA_APSIRT<<< gridDim, blockDim >>>( dev_MT, dev_MP, dev_MV, dev_np_stb, dev_np_cur, dev_traj_stb, dev_nproj, dev_ntraj, dev_npart );
+	GPUerrchk(cudaMemcpy(dst, src, sizeof(int)*length, kind));
 }
+
+__global__ void CUDA_work(double* x)
+{
+	if (*x<1.0f) *x += .1;
+	else *x = 0.0f;
+}
+void APSIRT_main_loop(MTraj dev_MT, MPart dev_MP, MPart host_MP, MVector dev_MV, int* dev_np_stb, int* dev_np_cur, int* dev_traj_stb, int* dev_nproj, int* dev_ntraj, int* dev_npart, int host_nttltraj, int *host_traj_stb)
+{
+	size_t blocks = ceilf( (int)(MAT_DIM) / 16.0f );
+	dim3 gridDim( blocks, blocks, host_nttltraj );
+	size_t threads = ceilf( (int)(MAT_DIM) / (float)blocks );
+	dim3 blockDim( threads, threads, 1 );
+ 
+
+	CUDA_APSIRT<<< gridDim, blockDim >>>( dev_MT, dev_MP, dev_MV, dev_np_stb, dev_np_cur, dev_traj_stb, dev_nproj, dev_ntraj, dev_npart );
+	
+	cudaDeviceSynchronize();
+	CUDA_COPY_int(dev_traj_stb, host_traj_stb, 1, cudaMemcpyDeviceToHost);
+	cudaDeviceSynchronize();
+	printf("\r\n>%d",*host_traj_stb);
+
+//CUDA_COPY_int(dev_MP, host_MP, MAT_SIZE, cudaMemcpyDeviceToHost);
+
+	
+	double h = *host_x;
+	GPUerrchk(cudaMemcpy(dev_x, host_x, sizeof(double), cudaMemcpyHostToDevice));
+	CUDA_work<<<1,1>>>(dev_x);
+	GPUerrchk(cudaMemcpy(host_x, dev_x, sizeof(double), cudaMemcpyDeviceToHost));
+	h = *host_x;
+	printf("\r\n %f",*host_x);
+}
+
 
 
 
@@ -275,11 +308,26 @@ int* prep_intarray(int length, int val)
 	return a;
 }
 
+int* prep_int(int val)
+{
+	int* a = (int*) malloc(sizeof(int));
+	*a = val;
+	return a;
+}
+
 int* CUDA_PREP_COPY_intarray(int* src, int length)
 {
 	int* c;
 	GPUerrchk(cudaMalloc((void**)&c, sizeof(int)*length));
 	GPUerrchk(cudaMemcpy(c, src, sizeof(int)*length, cudaMemcpyHostToDevice));
+	return c;
+}
+
+int* CUDA_PREP_COPY_int(int* src)
+{
+	int* c;
+	GPUerrchk(cudaMalloc((void**)&c, sizeof(int)));
+	GPUerrchk(cudaMemcpy(c, src, sizeof(int), cudaMemcpyHostToDevice));
 	return c;
 }
 
@@ -300,15 +348,16 @@ void test()
 	host_nttltraj = prep_intarray(1, (*host_ntraj)*(*host_nproj));
 	host_np_cur = prep_intarray(*host_nttltraj, 0);
 	host_np_stb = prep_intarray(*host_nttltraj, 0);
-	host_traj_stb = prep_intarray(1, 0);
+	host_traj_stb = prep_int(0);
 	
+
 	dev_npart =		CUDA_PREP_COPY_intarray(host_npart, 1);
 	dev_ntraj =		CUDA_PREP_COPY_intarray(host_ntraj, 1);
 	dev_nproj =		CUDA_PREP_COPY_intarray(host_nproj, 1);
 	dev_nttltraj =	CUDA_PREP_COPY_intarray(host_nttltraj, 1);
 	dev_np_cur =	CUDA_PREP_COPY_intarray(host_np_cur, *host_nttltraj);
 	dev_np_stb =	CUDA_PREP_COPY_intarray(host_np_cur, *host_nttltraj);
-	dev_traj_stb =	CUDA_PREP_COPY_intarray(host_traj_stb, 1);
+	dev_traj_stb =	CUDA_PREP_COPY_int(host_traj_stb);
 	
 
 	n_traj = m*n;
@@ -323,7 +372,7 @@ void test()
 	
 
 
-	APSIRT_main_loop(dev_MTraj, dev_MPart, dev_MV, dev_np_stb, dev_np_cur, dev_traj_stb, dev_nproj, dev_ntraj, dev_npart, *host_nttltraj);
+//	APSIRT_main_loop(dev_MTraj, dev_MPart, host_MPart, dev_MV, dev_np_stb, dev_np_cur, dev_traj_stb, dev_nproj, dev_ntraj, dev_npart, *host_nttltraj);
 
 
 	/*int* root = (int*) malloc(sizeof(int)*MAT_SIZE*2);
@@ -344,14 +393,7 @@ void test()
 GLuint positionsVBO;
 struct cudaGraphicsResource *positionsVBO_CUDA;
 
-double *dev_x;
-double *host_x;
 
-__global__ void CUDA_work(double* x)
-{
-	if (*x<1.0f) *x += .1;
-	else *x = 0.0f;
-}
 
 int color = 0;
 
@@ -468,12 +510,23 @@ void opengl_draw()
 }
 void update()
 {
-	double h = *host_x;
+	/*double h = *host_x;
 	GPUerrchk(cudaMemcpy(dev_x, host_x, sizeof(double), cudaMemcpyHostToDevice));
 	CUDA_work<<<1,1>>>(dev_x);
 	GPUerrchk(cudaMemcpy(host_x, dev_x, sizeof(double), cudaMemcpyDeviceToHost));
 	h = *host_x;
 	//printf("\r\n %f",*host_x);
+	
+	cudaDeviceSynchronize();*/
+	if (dbg_CUDA_active>0) 
+	{
+		APSIRT_main_loop(dev_MTraj, dev_MPart, host_MPart, dev_MV, dev_np_stb, dev_np_cur, dev_traj_stb, dev_nproj, dev_ntraj, dev_npart, *host_nttltraj, host_traj_stb);
+		dbg_CUDA_active--;
+		printf("\r\nCiclo %d\r\n",dbg_CUDA_active);
+	}
+
+
+
 	GPUerrchk(cudaDeviceSynchronize());
 	glutPostRedisplay();
 }
@@ -483,6 +536,7 @@ void keyboard_handler (unsigned char key, int x, int y)
 	if (key == 27) exit(0);	//ESC = exit
 	else if (key == 'v') dbg_showvec = dbg_showvec==0? 1 : 0;
 	else if (key == '+') { dbg_trajid = (dbg_trajid+1) < ((*host_ntraj)*(*host_nproj)) ? dbg_trajid+1 : 0 ; printf("\r\nTraj atual = %d",dbg_trajid); }
+	else if (key == 'a') { dbg_CUDA_active+= 50; };
 }
 
 
