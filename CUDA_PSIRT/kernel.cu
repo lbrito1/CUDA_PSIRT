@@ -109,9 +109,7 @@ __global__ void CUDA_APSIRT(MTraj MT, MPart MP, MVector MV, int* np_stb, int* np
 	int tid_x = blockIdx.x * blockDim.x + threadIdx.x;	
 	int tid_y = blockIdx.y * blockDim.y + threadIdx.y;	
 	int tid_z = blockIdx.z;
-	if (tid_z>0){ 
-	printf("\r\nx=%d\ty=%d\tz=%d",tid_x,tid_y,tid_z);
-	}
+
 	*traj_stb = 0;
 
 	int maxelem = *cfg_ntraj * (*cfg_nproj) * MAT_SIZE;
@@ -120,19 +118,27 @@ __global__ void CUDA_APSIRT(MTraj MT, MPart MP, MVector MV, int* np_stb, int* np
 
 	// 1. Calcular força resultante
 	int dist =  MT[M_idx(tid_z, tid_x, tid_y)];
-	/*int deltapart = np_stb[tid_z]-np_cur[tid_z];
+	int deltapart = np_stb[tid_z]-np_cur[tid_z];
 	
 	double resultant = deltapart/dist*dist;
 
 	int fr_x = (int) (MV[tid_z].x * resultant);
 	int fr_y = (int) (MV[tid_z].y * resultant);
-	/*
+	
+	int newpos_x = min(fr_x+tid_x,MAT_DIM);
+	int newpos_y = min(fr_y+tid_y,MAT_DIM);
+
 	// 2. Atualizar posição da partícula					// PERIGO CONCORRENCIA/ USAR SEC ATOMICA
 	if (MP[M_idx(0,tid_x,tid_y)] > 0) 
 	{
+		printf("\r\nMovendo %d parts DE(%d, %d) PARA(%d, %d)", MP[M_idx(0,tid_x,tid_y)], tid_x, tid_y, newpos_x, newpos_y);
+
+
 		atomicDec((unsigned int*) &MP[M_idx(0,tid_x,tid_y)], 0);
-		atomicInc((unsigned int*) &MP[M_idx(0,fr_x, fr_y) ], 0);
-	}*/
+		atomicInc((unsigned int*) &MP[M_idx(0,newpos_x, newpos_y) ], MAT_SIZE);
+	}
+
+
 	
 	// 3. Atualizar trajetórias
 	/*int qtd_parts = MP[M_idx(0, tid_x, tid_y)];
@@ -168,9 +174,11 @@ void APSIRT_main_loop(MTraj dev_MT, MPart dev_MP, MPart host_MP, MVector dev_MV,
 	cudaDeviceSynchronize();
 	CUDA_COPY_int(dev_traj_stb, host_traj_stb, 1, cudaMemcpyDeviceToHost);
 	cudaDeviceSynchronize();
-	printf("\r\n>%d",*host_traj_stb);
+	
 
-//CUDA_COPY_int(dev_MP, host_MP, MAT_SIZE, cudaMemcpyDeviceToHost);
+	Sleep(1000);
+
+    CUDA_COPY_int(dev_MP, host_MP, MAT_SIZE, cudaMemcpyDeviceToHost);
 
 	
 	double h = *host_x;
