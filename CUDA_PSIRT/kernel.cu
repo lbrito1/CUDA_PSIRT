@@ -63,7 +63,7 @@ int *host_MT_Sum;
 
 inline int belongs(double x, double y, double a, double b) { return (y==a*x + b) ? true : false; }
 
-inline int get_index(int x, int y) { return x*MAT_DIM+y <= MAT_SIZE ? x*MAT_DIM+y : -1; }
+__host__ __device__ inline int get_index(int x, int y) { return x*MAT_DIM+y <= MAT_SIZE ? x*MAT_DIM+y : -1; }
 __host__ __device__ inline int get_MT_offset(int i) { return i*MAT_SIZE; }
 __host__ __device__ inline int M_idx(int ofs, int x, int y) { return get_MT_offset(ofs)+get_index(x,y); }
 
@@ -109,20 +109,24 @@ __global__ void CUDA_APSIRT(MTraj MT, MPart MP, MVector MV, int* np_stb, int* np
 	int tid_x = blockIdx.x * blockDim.x + threadIdx.x;	
 	int tid_y = blockIdx.y * blockDim.y + threadIdx.y;	
 	int tid_z = blockIdx.z;
+	if (tid_z>0){ 
+	printf("\r\nx=%d\ty=%d\tz=%d",tid_x,tid_y,tid_z);
+	}
+	*traj_stb = 0;
 
-	//*traj_stb = 0;
-	///!!!!!!!!!!
-	*traj_stb = 2;
-	if(*traj_stb>0)printf("!!!!!!!!!!!!!!!");
+	int maxelem = *cfg_ntraj * (*cfg_nproj) * MAT_SIZE;
+
+	int thisIdx = M_idx(tid_z, tid_x, tid_y);
+
 	// 1. Calcular força resultante
-	/*int dist =  MT[M_idx(tid_z, tid_x, tid_y)];
-	int deltapart = np_stb[tid_z]-np_cur[tid_z];
-
+	int dist =  MT[M_idx(tid_z, tid_x, tid_y)];
+	/*int deltapart = np_stb[tid_z]-np_cur[tid_z];
+	
 	double resultant = deltapart/dist*dist;
 
 	int fr_x = (int) (MV[tid_z].x * resultant);
 	int fr_y = (int) (MV[tid_z].y * resultant);
-
+	/*
 	// 2. Atualizar posição da partícula					// PERIGO CONCORRENCIA/ USAR SEC ATOMICA
 	if (MP[M_idx(0,tid_x,tid_y)] > 0) 
 	{
