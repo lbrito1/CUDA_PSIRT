@@ -36,6 +36,9 @@ inline void GPUassert(cudaError_t code, char *file, int line, bool abort=true)
 
 #define FATOR_PROX 0.15
 
+#define FORCE_LIMIT 10
+
+#define FORCE_MULTIPLIER 10
 
 int dbg_showvec = 0;
 int dbg_trajid = 0;
@@ -120,7 +123,10 @@ __global__ void CUDA_APSIRT(MTraj MT, MPart MP, MVector MV, int* np_stb, int* np
 	int dist =  MT[M_idx(tid_z, tid_x, tid_y)];
 	int deltapart = np_stb[tid_z]-np_cur[tid_z];
 	
-	double resultant = deltapart/dist*dist;
+	double resultant = (float)deltapart/(float)(dist*dist);
+	if (dist==0) resultant = 0.0;
+	resultant = min(resultant, (double)FORCE_LIMIT);
+	resultant*=(double)FORCE_MULTIPLIER;
 
 	int fr_x = (int) (MV[tid_z].x * resultant);
 	int fr_y = (int) (MV[tid_z].y * resultant);
@@ -131,7 +137,8 @@ __global__ void CUDA_APSIRT(MTraj MT, MPart MP, MVector MV, int* np_stb, int* np
 	// 2. Atualizar posição da partícula					// PERIGO CONCORRENCIA/ USAR SEC ATOMICA
 	if (MP[M_idx(0,tid_x,tid_y)] > 0) 
 	{
-		printf("\r\nMovendo %d parts DE(%d, %d) PARA(%d, %d)", MP[M_idx(0,tid_x,tid_y)], tid_x, tid_y, newpos_x, newpos_y);
+		//printf("\r\nAtuacao de uma forca resultante de resultant = %f, vect = %f, %f \t FR=(%d,%d)", resultant, MV[tid_z].x, MV[tid_z].y,fr_x,fr_y);
+		//printf("\r\nMovendo %d parts DE(%d, %d) PARA(%d, %d)", MP[M_idx(0,tid_x,tid_y)], tid_x, tid_y, newpos_x, newpos_y);
 
 
 		atomicDec((unsigned int*) &MP[M_idx(0,tid_x,tid_y)], 0);
@@ -359,7 +366,7 @@ void test()
 	host_nproj = prep_intarray(1, n);
 	host_nttltraj = prep_intarray(1, (*host_ntraj)*(*host_nproj));
 	host_np_cur = prep_intarray(*host_nttltraj, 0);
-	host_np_stb = prep_intarray(*host_nttltraj, 0);
+	host_np_stb = prep_intarray(*host_nttltraj, 10); // DUMMY - atualizar com SINOGRAMA
 	host_traj_stb = prep_int(0);
 	
 
@@ -368,7 +375,7 @@ void test()
 	dev_nproj =		CUDA_PREP_COPY_intarray(host_nproj, 1);
 	dev_nttltraj =	CUDA_PREP_COPY_intarray(host_nttltraj, 1);
 	dev_np_cur =	CUDA_PREP_COPY_intarray(host_np_cur, *host_nttltraj);
-	dev_np_stb =	CUDA_PREP_COPY_intarray(host_np_cur, *host_nttltraj);
+	dev_np_stb =	CUDA_PREP_COPY_intarray(host_np_stb, *host_nttltraj);		
 	dev_traj_stb =	CUDA_PREP_COPY_int(host_traj_stb);
 	
 
