@@ -34,7 +34,7 @@ inline void GPUassert(cudaError_t code, char *file, int line, bool abort=true)
 
 #define FATOR_SEP 1
 
-#define FATOR_PROX 0.15
+#define FATOR_PROX 3
 
 #define FORCE_LIMIT 10
 
@@ -81,7 +81,9 @@ inline float2 rotate_vector(float2 v, float ang)
 inline int fator_separacao_trajs(int ntraj_per_proj) { return (int) ((double)MAT_DIM/((double)FATOR_SEP*(double)ntraj_per_proj)); }
 
 //retorna se a partícula pertence à trajetória distante dist da partícula. (saída: distancia se pertence ou 0 para desconsiderar)
-inline int part_is_in_traj(int dist, int ntraj_per_proj) { return dist <= (int) (ntraj_per_proj*((double)FATOR_PROX)) ? dist : 0 ;  };
+__host__ __device__ inline int part_is_in_traj(int dist, int ntraj_per_proj) {
+	return dist <= (int) (ntraj_per_proj*((double)FATOR_PROX)) ? dist : 0 ;  
+};
 
 inline double to_GL_coord(int x) { return (2*x/(double)MAT_DIM) - 1.0f; }
 
@@ -148,13 +150,15 @@ __global__ void CUDA_APSIRT(MTraj MT, MPart MP, MVector MV, int* np_stb, int* np
 
 	
 	// 3. Atualizar trajetórias
-	/*int qtd_parts = MP[M_idx(0, tid_x, tid_y)];
-	int dist = MT[M_idx(tid_z, tid_x, tid_y)];
+	int qtd_parts = MP[M_idx(0, tid_x, tid_y)];
+	dist = MT[M_idx(tid_z, tid_x, tid_y)];
 
-	if (qtd_parts>0 && part_is_in_traj(dist, cfg_ntraj)) atomicAdd(&np_cur[tid_z], qtd_parts);
+	if (qtd_parts>0 && part_is_in_traj(dist, *cfg_ntraj)) atomicAdd(&np_cur[tid_z], qtd_parts);
 
 	// 4. Checar convergência
-	if (*np_cur >= *np_stb) atomicInc(traj_stb,0);*/
+	if (*np_cur >= *np_stb) {
+		atomicInc((unsigned int*) &traj_stb,0);
+	}
 }
 
 
