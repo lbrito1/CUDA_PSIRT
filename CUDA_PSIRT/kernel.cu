@@ -1,4 +1,4 @@
-#include "cuda.h"
+#include <cuda.h>
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 #include <stdio.h>
@@ -51,18 +51,18 @@ struct hfloat2 { float x; float y; };
 
 typedef int* MTraj;	// Matriz MAT_DIM x MAT_DIM
 MTraj host_MTraj;
-MTraj dev_MTraj;
+__device__ MTraj dev_MTraj;
 int n_traj = 1;
 int n_proj;
 
 typedef int* MPart;	// Matriz MAT_DIM x MAT_DIM, cada elem>0 = 1 particula, id=1..MAX_INT
 MPart host_MPart;
-MPart dev_MPart;
+__device__ MPart dev_MPart;
 int n_part = 10;
 
 typedef float2* MVector; // Matriz MAT_DIM x MAT_DIM, cada elem = vetor unidade força naquele ponto	
 MVector host_MV;
-MVector dev_MV;
+__device__ MVector dev_MV;
 
 int *host_MT_Sum;
 
@@ -150,7 +150,7 @@ __global__ void CUDA_APSIRT(MTraj MT, MPart MP, MVector MV, int* np_stb, int* np
 	}
 
 
-	
+	/*
 	// 3. Atualizar trajetórias
 	int qtd_parts = MP[M_idx(0, tid_x, tid_y)];
 	dist = MT[M_idx(tid_z, tid_x, tid_y)];
@@ -160,7 +160,7 @@ __global__ void CUDA_APSIRT(MTraj MT, MPart MP, MVector MV, int* np_stb, int* np
 	// 4. Checar convergência
 	if (*np_cur >= *np_stb) {
 		atomicInc((unsigned int*) &traj_stb,0);
-	}
+	}*/
 }
 
 
@@ -176,22 +176,24 @@ __global__ void CUDA_work(double* x)
 }
 void APSIRT_main_loop(MTraj dev_MT, MPart dev_MP, MPart host_MP, MVector dev_MV, int* dev_np_stb, int* dev_np_cur, int* host_np_cur, int* dev_traj_stb, int* dev_nproj, int* dev_ntraj, int* dev_npart, int host_nttltraj, int *host_traj_stb)
 {
+	printf(".");
+
 	size_t blocks = ceilf( (int)(MAT_DIM) / 16.0f );
 	dim3 gridDim( blocks, blocks, host_nttltraj );
 	size_t threads = ceilf( (int)(MAT_DIM) / (float)blocks );
 	dim3 blockDim( threads, threads, 1 );
  
-
 	CUDA_APSIRT<<< gridDim, blockDim >>>( dev_MT, dev_MP, dev_MV, dev_np_stb, dev_np_cur, dev_traj_stb, dev_nproj, dev_ntraj, dev_npart );
-	cudaDeviceSynchronize();
+	GPUerrchk( cudaPeekAtLastError() );
+	GPUerrchk( cudaDeviceSynchronize() );
 
 	//CUDA_COPY_int(dev_traj_stb, host_traj_stb, 1, cudaMemcpyDeviceToHost);
 
-    //CUDA_COPY_int(dev_MP, host_MP, MAT_SIZE, cudaMemcpyDeviceToHost);
+    CUDA_COPY_int(dev_MP, host_MP, MAT_SIZE, cudaMemcpyDeviceToHost);
 
 	//CUDA_COPY_int(dev_np_cur, host_np_cur, host_nttltraj, cudaMemcpyDeviceToHost);
 
-	
+	cudaDeviceSynchronize();
 	Sleep(dbg_spd*100);
 }
 
@@ -349,9 +351,11 @@ int* CUDA_PREP_COPY_int(int* src)
 	return c;
 }
 
-int *host_npart, *dev_npart;
-int *host_ntraj, *host_nproj, *host_nttltraj, *dev_ntraj, *dev_nproj, *dev_nttltraj;
-int *host_np_cur, *host_np_stb, *host_traj_stb, *dev_np_cur, *dev_np_stb, *dev_traj_stb;
+int *host_npart;
+int *host_ntraj, *host_nproj, *host_nttltraj;
+int *host_np_cur, *host_np_stb, *host_traj_stb;
+
+__device__ int *dev_npart, *dev_ntraj, *dev_nproj, *dev_nttltraj, *dev_np_cur, *dev_np_stb, *dev_traj_stb;
 
 void test()
 {
@@ -529,24 +533,13 @@ void opengl_draw()
 }
 void update()
 {
-	/*double h = *host_x;
-	GPUerrchk(cudaMemcpy(dev_x, host_x, sizeof(double), cudaMemcpyHostToDevice));
-	CUDA_work<<<1,1>>>(dev_x);
-	GPUerrchk(cudaMemcpy(host_x, dev_x, sizeof(double), cudaMemcpyDeviceToHost));
-	h = *host_x;
-	//printf("\r\n %f",*host_x);
-	
-	cudaDeviceSynchronize();*/
 	if (dbg_CUDA_active>0) 
 	{
+		if (dbg_CUDA_active==50) printf("\r\nIterando APSIRT...");
 		APSIRT_main_loop(dev_MTraj, dev_MPart, host_MPart, dev_MV, dev_np_stb, dev_np_cur, host_np_cur, dev_traj_stb, dev_nproj, dev_ntraj, dev_npart, *host_nttltraj, host_traj_stb);
 		dbg_CUDA_active--;
-		printf("\r\nCiclo %d\r\n",dbg_CUDA_active);
+		if (dbg_CUDA_active==0)  printf("\r\nEncerrou APSIRT.");
 	}
-
-
-
-	
 	glutPostRedisplay();
 }
 
@@ -557,10 +550,10 @@ void keyboard_handler (unsigned char key, int x, int y)
 	else if (key == '+') { dbg_trajid = (dbg_trajid+1) < ((*host_ntraj)*(*host_nproj)) ? dbg_trajid+1 : 0 ; printf("\r\nTraj atual = %d",dbg_trajid); 
 	dbg_spd = dbg_spd > 3 ? 0 : dbg_spd+1;
 	}
-	else if (key == 'a') { dbg_CUDA_active+= 50; };
+	else if (key == 'a') { dbg_CUDA_active = 50; };
 }
 
-
+void a() {}
 void init_opengl(int argc, char* argv[])
 {
 	glutInit(&argc, argv);
@@ -579,24 +572,14 @@ void init_opengl(int argc, char* argv[])
 
 int main(int argc, char* argv[])
 {
-	host_x = (double*) malloc(sizeof(double));
-	*host_x = 0.0f;
-	cudaError_t cudaStatus;
-	GPUerrchk(cudaMalloc((void**)&dev_x, sizeof(double)));
-	
-
-
 	test();
 
 
 	// 3. EXECUTAR / DESENHAR
 	init_opengl(argc, argv);
 
-    cudaStatus = cudaDeviceReset();
-	if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaDeviceReset failed!");
-        return 1;
-    }
 
+    GPUerrchk(cudaDeviceReset());
+	
     return 0;
 }
