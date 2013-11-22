@@ -150,17 +150,17 @@ __global__ void CUDA_APSIRT(MTraj MT, MPart MP, MVector MV, int* np_stb, int* np
 	}
 
 
-	/*
+	
 	// 3. Atualizar trajetórias
 	int qtd_parts = MP[M_idx(0, tid_x, tid_y)];
 	dist = MT[M_idx(tid_z, tid_x, tid_y)];
 
 	if (qtd_parts>0 && part_is_in_traj(dist, *cfg_ntraj)) atomicAdd(&np_cur[tid_z], qtd_parts);
-
+	
 	// 4. Checar convergência
 	if (*np_cur >= *np_stb) {
-		atomicInc((unsigned int*) &traj_stb,0);
-	}*/
+		atomicInc((unsigned int*) traj_stb,0);
+	}
 }
 
 
@@ -187,11 +187,9 @@ void APSIRT_main_loop(MTraj dev_MT, MPart dev_MP, MPart host_MP, MVector dev_MV,
 	GPUerrchk( cudaPeekAtLastError() );
 	GPUerrchk( cudaDeviceSynchronize() );
 
-	//CUDA_COPY_int(dev_traj_stb, host_traj_stb, 1, cudaMemcpyDeviceToHost);
-
+	CUDA_COPY_int(dev_traj_stb, host_traj_stb, 1, cudaMemcpyDeviceToHost);
     CUDA_COPY_int(dev_MP, host_MP, MAT_SIZE, cudaMemcpyDeviceToHost);
-
-	//CUDA_COPY_int(dev_np_cur, host_np_cur, host_nttltraj, cudaMemcpyDeviceToHost);
+	CUDA_COPY_int(dev_np_cur, host_np_cur, host_nttltraj, cudaMemcpyDeviceToHost);
 
 	cudaDeviceSynchronize();
 	Sleep(dbg_spd*100);
