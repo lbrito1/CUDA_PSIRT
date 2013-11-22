@@ -45,7 +45,7 @@ inline void GPUassert(cudaError_t code, char *file, int line, bool abort=true)
 int dbg_showvec = 0;
 int dbg_trajid = 0;
 int dbg_CUDA_active = 0;
-int dbg_spd = 0;
+int dbg_spd = 1;
 
 
 struct hfloat2 { float x; float y; };
@@ -190,7 +190,7 @@ void APSIRT_main_loop(MTraj dev_MT, MPart dev_MP, MPart host_MP, MVector dev_MV,
 	CUDA_COPY_int(dev_np_cur, host_np_cur, host_nttltraj, cudaMemcpyDeviceToHost);
 
 	cudaDeviceSynchronize();
-	Sleep(dbg_spd*100);
+	Sleep(dbg_spd*50);
 }
 
 
@@ -244,8 +244,8 @@ void prep_MV(MVector MV, int traj_id, double proj_ang, double a, double b)
 			vec.y = 1.0f;
 			nv = rotate_vector(vec, ang);
 
-			MV[M_idx(traj_id, x, y)].x = nv.x;
-			MV[M_idx(traj_id, x, y)].y = nv.y;
+			MV[M_idx(traj_id, x, y)].x = -nv.x;
+			MV[M_idx(traj_id, x, y)].y = -nv.y;
 		}
 	}
 }
@@ -353,7 +353,7 @@ void opengl_draw()
 	glClear(GL_COLOR_BUFFER_BIT);
 
 
-	glPointSize(2.0);
+	glPointSize(1.0f);
 	glBegin(GL_POINTS);
 
 	glColor3f(1.0f,1.0f,1.0f);
@@ -396,21 +396,7 @@ void opengl_draw()
 	}
 
 
-	// DESENHAR PARTICULAS (SOBREPOE TRAJ)
 
-	for (int i=0;i<MAT_DIM; i++) 
-		{
-			for (int j=0;j<MAT_DIM; j++) 
-			{
-				int val = host_MPart[M_idx(0,i,j)];
-				if (val > 0) 
-				{
-					glColor3f(0.0f,1.0f,0.0f);
-					glVertex2d(to_GL_coord(i), to_GL_coord(j));
-
-				}
-			}
-		}
 
 	// DESENHAR CAMPO VET
 	if (dbg_showvec)
@@ -441,13 +427,29 @@ void opengl_draw()
 		}
 	}
 
-
+		// DESENHAR PARTICULAS (SOBREPOE TRAJ)
 
 	glEnd();
 
+	glPointSize(7.0f);
+	glBegin(GL_POINTS);
+
+	for (int i=0;i<MAT_DIM; i++) 
+	{
+		for (int j=0;j<MAT_DIM; j++) 
+		{
+			int val = host_MPart[M_idx(0,i,j)];
+			if (val > 0) 
+			{
+				glColor3f(0.7f, 0.7f,0.0f);
+				glVertex2d(to_GL_coord(i), to_GL_coord(j));
+			}
+		}
+	}
+
+	glEnd();
 
 	glFlush();	
-	Sleep(50);
 }
 void update()
 {
@@ -482,11 +484,6 @@ void init_opengl(int argc, char* argv[])
 	glutMainLoop();
 }
 
-
-
-
-
-
 int main(int argc, char* argv[])
 {
 	host_npart = prep_intarray(1, 0);
@@ -515,11 +512,8 @@ int main(int argc, char* argv[])
 	host_MPart = prep_MP(n_part);
 	dev_MPart = CUDA_PREP_COPY_MP(host_MPart);
 
-
-
 	// 3. EXECUTAR / DESENHAR
 	init_opengl(argc, argv);
-	
 
     GPUerrchk(cudaDeviceReset());
 	
