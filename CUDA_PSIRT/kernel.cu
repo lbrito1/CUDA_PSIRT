@@ -9,6 +9,8 @@
 #include <math.h>
 #include <cuda_gl_interop.h>
 
+#include "psirt_utils.h"
+
 inline void GPUassert(cudaError_t code, char *file, int line, bool abort=true)
 {
    if (code != cudaSuccess)
@@ -169,11 +171,7 @@ inline void CUDA_COPY_int(int* src, int* dst, int length, cudaMemcpyKind kind)
 	GPUerrchk(cudaMemcpy(dst, src, sizeof(int)*length, kind));
 }
 
-__global__ void CUDA_work(double* x)
-{
-	if (*x<1.0f) *x += .1;
-	else *x = 0.0f;
-}
+
 void APSIRT_main_loop(MTraj dev_MT, MPart dev_MP, MPart host_MP, MVector dev_MV, int* dev_np_stb, int* dev_np_cur, int* host_np_cur, int* dev_traj_stb, int* dev_nproj, int* dev_ntraj, int* dev_npart, int host_nttltraj, int *host_traj_stb)
 {
 	printf(".");
@@ -201,7 +199,7 @@ void APSIRT_main_loop(MTraj dev_MT, MPart dev_MP, MPart host_MP, MVector dev_MV,
 void prep_MT_cells(int *MT, int offset, double a, double b)
 {
 	
-	//printf("\r\nPreparando matriz id#%d, eq y=%f*x+%f\r\n\------------r\n",get_MT_offset(offset), a, b);
+//	printf("\r\nPreparando matriz id#%d, eq y=%f*x+%f\r\n\------------r\n",get_MT_offset(offset), a, b);
 	// y = ax + b
 	for (int j=0; j<MAT_DIM; j++) 
 	{
@@ -217,10 +215,10 @@ void prep_MT_cells(int *MT, int offset, double a, double b)
 
 				MT[M_idx(offset,i,j)] = (int)sqrt(dx*dx + dy*dy);
 			}
-		//	printf(" %d", MT[M_idx(offset,i,j)]);
+			//printf(" %d", MT[M_idx(offset,i,j)]);
 		}
 
-		//printf("\r\n");
+	//	printf("\r\n");
 	}
 }
 
@@ -274,7 +272,6 @@ MTraj prep_MT_from_config(int m, int n, MVector MV)
 			get_eq_traj_director(ang*i, &a, &b);
 			n_b = b + b_delta - (int)((double)MAT_DIM/2);
 			prep_MT_cells(root, offset, a, n_b);
-				
 			prep_MV(MV, offset, ang*i, a, n_b);
 		}
 	} 
@@ -319,13 +316,6 @@ MPart CUDA_PREP_COPY_MP(MPart MP_src)
 	return dev_p;
 }
 
-int* prep_intarray(int length, int val)
-{
-	int* a = (int*) malloc(sizeof(int)*length);
-	for (int i=0;i<length;i++) a[i] = val;
-	return a;
-}
-
 int* prep_int(int val)
 {
 	int* a = (int*) malloc(sizeof(int));
@@ -355,83 +345,12 @@ int *host_np_cur, *host_np_stb, *host_traj_stb;
 
 __device__ int *dev_npart, *dev_ntraj, *dev_nproj, *dev_nttltraj, *dev_np_cur, *dev_np_stb, *dev_traj_stb;
 
-void test()
-{
-	int m, n;
-	m = 3;
-	n = 7;
-	n_part = 64;
-
-	host_npart = prep_intarray(1, n_part);
-	host_ntraj = prep_intarray(1, m);
-	host_nproj = prep_intarray(1, n);
-	host_nttltraj = prep_intarray(1, (*host_ntraj)*(*host_nproj));
-	host_np_cur = prep_intarray(*host_nttltraj, 0);
-	host_np_stb = prep_intarray(*host_nttltraj, 10); // DUMMY - atualizar com SINOGRAMA
-	host_traj_stb = prep_int(0);
-	
-
-	dev_npart =		CUDA_PREP_COPY_intarray(host_npart, 1);
-	dev_ntraj =		CUDA_PREP_COPY_intarray(host_ntraj, 1);
-	dev_nproj =		CUDA_PREP_COPY_intarray(host_nproj, 1);
-	dev_nttltraj =	CUDA_PREP_COPY_intarray(host_nttltraj, 1);
-	dev_np_cur =	CUDA_PREP_COPY_intarray(host_np_cur, *host_nttltraj);
-	dev_np_stb =	CUDA_PREP_COPY_intarray(host_np_stb, *host_nttltraj);		
-	dev_traj_stb =	CUDA_PREP_COPY_int(host_traj_stb);
-	
-
-	n_traj = m*n;
-	host_MTraj = prep_MT_from_config(m,n, host_MV);
-	host_MT_Sum = (int*) malloc(sizeof(int)*MAT_SIZE);
-	dev_MTraj = CUDA_PREP_COPY_MT(host_MTraj, m,n);
-	dev_MV = CUDA_PREP_COPY_MV(host_MV, m, n);
-
-	host_MPart = prep_MP(n_part);
-	dev_MPart = CUDA_PREP_COPY_MP(host_MPart);
-
-	
-
-
-//	APSIRT_main_loop(dev_MTraj, dev_MPart, host_MPart, dev_MV, dev_np_stb, dev_np_cur, dev_traj_stb, dev_nproj, dev_ntraj, dev_npart, *host_nttltraj);
-
-
-	/*int* root = (int*) malloc(sizeof(int)*MAT_SIZE*2);
-
-	double ang = 120.0f;
-
-	double a, b;
-	
-	get_eq_traj_director(60.0f, &a, &b);
-	prep_MT_cells(root, 0, a, b);
-
-	get_eq_traj_director(ang, &a, &b);
-	prep_MT_cells(root, 1, a, b);*/
-}
-
-
-
-GLuint positionsVBO;
-struct cudaGraphicsResource *positionsVBO_CUDA;
-
-
-
 int color = 0;
 
 void opengl_draw()
 {
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
-	
-/*	glBegin(GL_POLYGON);
-
-	glVertex2f(*host_x,-*host_x);
-	glVertex2f(0.6,0.6);
-	glVertex2f(0.6,0.2);
-
-	glEnd();*/
-
-	
-
 
 
 	glPointSize(2.0);
@@ -444,7 +363,7 @@ void opengl_draw()
 
 	for (int i=0; i<MAT_SIZE; i++) host_MT_Sum[i] = 0;
 
-	for (int k=0; k<n_traj; k++) 
+	for (int k=0; k<*host_nttltraj; k++) 
 	{
 		for (int i=0;i<MAT_DIM; i++) 
 		{
@@ -473,22 +392,6 @@ void opengl_draw()
 			float val_norm = abs(1-(val/(double)maxval));
 			glColor3f(val_norm,val_norm,val_norm);
 			glVertex2d(to_GL_coord(i), to_GL_coord(j));
-		}
-	}
-
-	for (int k=0; k<n_traj; k++) 
-	{
-		for (int i=0;i<MAT_DIM; i++) 
-		{
-			for (int j=0;j<MAT_DIM; j++) 
-			{
-				int val = host_MTraj[M_idx(k,i,j)];
-				if (val == 0) 
-				{
-					glColor3f(1.0f,0.0f,0.0f);
-					glVertex2d(to_GL_coord(i), to_GL_coord(j));
-				}
-			}
 		}
 	}
 
@@ -522,6 +425,23 @@ void opengl_draw()
 	}
 
 
+	
+	for (int k=0; k<*host_nttltraj; k++) 
+	{
+		for (int i=0;i<MAT_DIM; i++) 
+		{
+			for (int j=0;j<MAT_DIM; j++) 
+			{
+				if (host_MTraj[M_idx(k,i,j)]== 0) 
+				{
+					glColor3f(1.0f,0.0f,0.0f);
+					glVertex2d(to_GL_coord(i), to_GL_coord(j));
+				}
+			}
+		}
+	}
+
+
 
 	glEnd();
 
@@ -533,7 +453,7 @@ void update()
 {
 	if (dbg_CUDA_active>0) 
 	{
-		if (dbg_CUDA_active==50) printf("\r\nIterando APSIRT...");
+		if (dbg_CUDA_active==50) printf("\r\nIterando APSIRT");
 		APSIRT_main_loop(dev_MTraj, dev_MPart, host_MPart, dev_MV, dev_np_stb, dev_np_cur, host_np_cur, dev_traj_stb, dev_nproj, dev_ntraj, dev_npart, *host_nttltraj, host_traj_stb);
 		dbg_CUDA_active--;
 		if (dbg_CUDA_active==0)  printf("\r\nEncerrou APSIRT.");
@@ -551,7 +471,6 @@ void keyboard_handler (unsigned char key, int x, int y)
 	else if (key == 'a') { dbg_CUDA_active = 50; };
 }
 
-void a() {}
 void init_opengl(int argc, char* argv[])
 {
 	glutInit(&argc, argv);
@@ -570,12 +489,37 @@ void init_opengl(int argc, char* argv[])
 
 int main(int argc, char* argv[])
 {
-	test();
+	host_npart = prep_intarray(1, 0);
+	host_ntraj = prep_intarray(1, 0);
+	host_nproj = prep_intarray(1, 0);
+	host_traj_stb = prep_intarray(1, 0);
+	
+	host_np_stb = read_sinogram("s.txt", host_nproj, host_ntraj, host_npart);
+	
+	host_nttltraj = prep_intarray(1, (*host_ntraj)*(*host_nproj));
+	host_np_cur = prep_intarray(*host_nttltraj, 0);
+	
+	dev_npart =		CUDA_PREP_COPY_intarray(host_npart, 1);
+	dev_ntraj =		CUDA_PREP_COPY_intarray(host_ntraj, 1);
+	dev_nproj =		CUDA_PREP_COPY_intarray(host_nproj, 1);
+	dev_nttltraj =	CUDA_PREP_COPY_intarray(host_nttltraj, 1);
+	dev_np_cur =	CUDA_PREP_COPY_intarray(host_np_cur, *host_nttltraj);
+	dev_np_stb =	CUDA_PREP_COPY_intarray(host_np_stb, *host_nttltraj);		
+	dev_traj_stb =	CUDA_PREP_COPY_int(host_traj_stb);
+	
+	host_MTraj = prep_MT_from_config(*host_nproj, *host_ntraj, host_MV);
+	host_MT_Sum = (int*) malloc(sizeof(int)*MAT_SIZE);
+	dev_MTraj = CUDA_PREP_COPY_MT(host_MTraj, *host_nproj, *host_ntraj);
+	dev_MV = CUDA_PREP_COPY_MV(host_MV, *host_nproj, *host_ntraj);
+
+	host_MPart = prep_MP(n_part);
+	dev_MPart = CUDA_PREP_COPY_MP(host_MPart);
+
 
 
 	// 3. EXECUTAR / DESENHAR
 	init_opengl(argc, argv);
-
+	
 
     GPUerrchk(cudaDeviceReset());
 	
