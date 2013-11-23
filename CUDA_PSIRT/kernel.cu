@@ -25,7 +25,9 @@ inline void GPUassert(cudaError_t code, char *file, int line, bool abort=true)
 #define PI 3.14159265
 #define RAD(X) ((X*PI/180.0))
 
-#define RES_X 160
+#ifndef RES_X
+#define RES_X 320
+#endif
 #define RES_Y RES_X
 
 #define MAT_DIM RES_X
@@ -36,11 +38,15 @@ inline void GPUassert(cudaError_t code, char *file, int line, bool abort=true)
 
 #define FATOR_SEP 1
 
-#define FATOR_PROX 3
+#ifndef FATOR_PROX
+#define FATOR_PROX 1
+#endif
 
 #define FORCE_LIMIT 10
 
-#define FORCE_MULTIPLIER 10
+#ifndef FORCE_MULTIPLIER
+#define FORCE_MULTIPLIER 250
+#endif
 
 int dbg_showvec = 0;
 int dbg_trajid = 0;
@@ -126,6 +132,7 @@ __global__ void CUDA_APSIRT(MTraj MT, MPart MP, MVector MV, int* np_stb, int* np
 	if (dist==0) resultant = 0.0;
 	resultant = min(resultant, (double)FORCE_LIMIT);
 	resultant*=(double)FORCE_MULTIPLIER;
+	if (resultant<0) resultant = 0.0f;	// nao permitir trajetorias repelindo
 
 	int fr_x = (int) (MV[tid_z].x * resultant);
 	int fr_y = (int) (MV[tid_z].y * resultant);
@@ -232,8 +239,8 @@ void prep_MV(MVector MV, int traj_id, double proj_ang, double a, double b)
 		for (int y=0; y<MAT_DIM; y++) 
 		{
 			double ang;
-			if (proj_ang<90.0) ang = (y>yreta) ? sum_angle(proj_ang, -90.0f) : sum_angle(proj_ang, 90.0f) ;
-			else ang = (y>yreta) ? sum_angle(proj_ang, 90.0f) : sum_angle(proj_ang, -90.0f) ;
+			if (proj_ang<90.0)	ang = (y<yreta) ? sum_angle(proj_ang, -90.0f) : sum_angle(proj_ang, 90.0f) ;
+			else				ang = (y>yreta) ? sum_angle(proj_ang, 90.0f) : sum_angle(proj_ang, -90.0f) ;
 			
 			float2 vec, nv;
 			vec.x = 1.0f;
@@ -368,7 +375,7 @@ void opengl_draw()
 				int val = host_MTraj[M_idx(k,i,j)];
 				//float val_norm = abs(1-(val/(double)MAT_DIM));
 				
-				val *= host_np_stb[k] - host_np_cur[k];	// divide por intensidade atual
+				val *= max(0,host_np_stb[k] - host_np_cur[k]);	// divide por intensidade atual
 
 				int nval = host_MT_Sum[M_idx(0,i,j)] += val;
 				maxval = nval>maxval? nval:maxval;
@@ -471,7 +478,7 @@ void keyboard_handler (unsigned char key, int x, int y)
 	else if (key == '+') { dbg_trajid = (dbg_trajid+1) < ((*host_ntraj)*(*host_nproj)) ? dbg_trajid+1 : 0 ; printf("\r\nTraj atual = %d",dbg_trajid); 
 	dbg_spd = dbg_spd > 3 ? 0 : dbg_spd+1;
 	}
-	else if (key == 'a') { dbg_CUDA_active = 50; };
+	else if (key == 'a') { dbg_CUDA_active = 250; };
 }
 
 void init_opengl(int argc, char* argv[])
@@ -510,7 +517,7 @@ int main(int argc, char* argv[])
 	dev_MTraj = CUDA_PREP_COPY_MT(host_MTraj, *host_nproj, *host_ntraj);
 	dev_MV = CUDA_PREP_COPY_MV(host_MV, *host_nproj, *host_ntraj);
 
-	host_MPart = prep_MP(n_part);
+	host_MPart = prep_MP(*host_npart);
 	dev_MPart = CUDA_PREP_COPY_MP(host_MPart);
 
 	// 3. EXECUTAR / DESENHAR
