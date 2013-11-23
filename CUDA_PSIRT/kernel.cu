@@ -77,8 +77,9 @@ __host__ __device__ inline int M_idx(int ofs, int x, int y) { return get_MT_offs
 inline float2 rotate_vector(float2 v, float ang) 
 {
 	float2 nv;
-	nv.x = v.x*cos(ang) - v.y*sin(ang);
-	nv.y = v.x*sin(ang) - v.y*cos(ang);
+
+	nv.x = v.x*cos(RAD(ang)) - v.y*sin(RAD(ang));
+	nv.y = v.x*sin(RAD(ang)) - v.y*cos(RAD(ang));
 	return nv;
 }
 
@@ -97,14 +98,6 @@ inline float sum_angle(float angle, float sum)
 	if (x>360.0f) return x-360.0f;
 	else if (x<0.0f) return 360.0f - abs(x);
 	else return x;
-}
-
-inline hfloat2 get_MT_vectors(float angle)
-{
-	hfloat2 vectors;
-	vectors.x = sum_angle(angle, 90.0f);
-	vectors.y = sum_angle(angle, -90.0f);
-	return vectors;
 }
 
 double *dev_x;
@@ -190,7 +183,7 @@ void APSIRT_main_loop(MTraj dev_MT, MPart dev_MP, MPart host_MP, MVector dev_MV,
 	CUDA_COPY_int(dev_np_cur, host_np_cur, host_nttltraj, cudaMemcpyDeviceToHost);
 
 	cudaDeviceSynchronize();
-	Sleep(dbg_spd*50);
+	//Sleep(dbg_spd*5);
 }
 
 
@@ -238,14 +231,17 @@ void prep_MV(MVector MV, int traj_id, double proj_ang, double a, double b)
 
 		for (int y=0; y<MAT_DIM; y++) 
 		{
-			double ang = (y<yreta) ? sum_angle(proj_ang, -90.0f) : sum_angle(proj_ang, 90.0f) ;
+			double ang;
+			if (proj_ang<90.0) ang = (y>yreta) ? sum_angle(proj_ang, -90.0f) : sum_angle(proj_ang, 90.0f) ;
+			else ang = (y>yreta) ? sum_angle(proj_ang, 90.0f) : sum_angle(proj_ang, -90.0f) ;
+			
 			float2 vec, nv;
 			vec.x = 1.0f;
-			vec.y = 1.0f;
+			vec.y = 0.0f;
 			nv = rotate_vector(vec, ang);
 
-			MV[M_idx(traj_id, x, y)].x = -nv.x;
-			MV[M_idx(traj_id, x, y)].y = -nv.y;
+			MV[M_idx(traj_id, x, y)].x = nv.x;
+			MV[M_idx(traj_id, x, y)].y = nv.y;
 		}
 	}
 }
@@ -405,7 +401,12 @@ void opengl_draw()
 		for (int j=0;j<MAT_DIM; j++) 
 		{
 			float2 vec = host_MV[M_idx(dbg_trajid, i, j)];
-			glColor3f(vec.x, vec.y, 0.0f);
+			float r,g,b;
+			if (vec.x>0) r = 1.0f;
+			else if (vec.x<0) r = 0.0f;
+			if (vec.y>0) g = 1.0f;
+			else if (vec.y<0) g = 0.0f;
+			glColor3f(r, g, 0.0f);
 			glVertex2d(to_GL_coord(i), to_GL_coord(j));
 		}
 	}
